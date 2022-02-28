@@ -1,0 +1,27 @@
+ame-template: 'v$NEXT_MINOR_VERSION 🌈'
+tag-template: '$NEXT_MINOR_VERSION'
+filter-by-commitish: true
+commitish: main
+categories:
+  - title: '🚀 Mejoras'
+    label: 'feature'
+  - title: '🐛 Correcciones'
+    labels:
+      - 'hotfix'
+      - 'bugfix'
+  - title: '🌱 Actualizaciones'
+    label: 'update'
+exclude-labels:
+  - 'skip-changelog'
+template: |
+  ## Registro de cambios
+
+  $CHANGES
+
+  ## Colaboradores de esta versión
+
+  $CONTRIBUTORS
+
+  ## Versión anterior
+
+  $PREVIOUS_TAG

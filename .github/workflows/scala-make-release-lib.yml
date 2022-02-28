@@ -1,0 +1,138 @@
+name: scala-make-release-lib
+
+on:
+  workflow_call:
+    inputs:
+      force-release:
+        required: false
+        type: string
+    secrets:
+      SYSADMIN_PAT:
+        required: true
+
+jobs:
+  check-changes:
+    runs-on: ubuntu-latest
+    name: changed-files
+    outputs:
+      changed-scala-files: ${{ steps.changed-scala-files.outputs.any_changed }}
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 2
+
+      - name: Get scala changed files
+        id: changed-scala-files
+        uses: tj-actions/changed-files@v15
+        with:
+          files: |
+            *.sbt
+            **/*.scala     
+
+  make-release:
+    needs: check-changes
+    if: (needs.check-changes.outputs.changed-scala-files == 'true' || inputs.force-release == 'true') && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Set up JDK 1.8
+        uses: actions/setup-java@v2
+        with:
+          distribution: 'adopt'
+          java-version: '8'
+
+      - name: Cache sbt
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.sbt
+            ~/.ivy2/cache
+            ~/.coursier
+            ~/.cache/coursier
+          key: sbt-cache-${{ runner.os }}-${{ matrix.target-platform }}-${{ hashFiles('project/build.properties') }}
+
+      - name: Release
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          sbt "release with-defaults"
+
+      - name: Extract latest version
+        run: echo "VERSION=`echo $(git describe --tags $(git rev-list --tags --max-count=1))`" >> $GITHUB_ENV
+
+      - name: Publish release notes
+        uses: release-drafter/release-drafter@v5
+        with:
+          publish: true
+          name: "${{ env.VERSION }}"
+          tag: "${{ env.VERSION }}"
+          version: "${{ env.VERSION }}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.SYSADMIN_PAT }}
+
+  make-release-hotfix:
+    needs: check-changes
+    if: (needs.check-changes.outputs.changed-scala-files == 'true' || inputs.force-release == 'true') && startsWith(github.ref, 'refs/heads/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Clone Repository
+        uses: actions/checkout@v2
+        with:
+          token: ${{ secrets.SYSADMIN_PAT }}
+
+      - name: Set up JDK 1.8
+        uses: actions/setup-java@v2
+        with:
+          distribution: 'adopt'
+          java-version: '8'
+
+      - name: Cache sbt
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.sbt
+            ~/.ivy2/cache
+            ~/.coursier
+            ~/.cache/coursier
+          key: sbt-cache-${{ runner.os }}-${{ matrix.target-platform }}-${{ hashFiles('project/build.properties') }}
+
+      - name: Release Hotfix
+        run: |
+          git config --global user.name github-actions
+          git config --global user.email github-actions@github.com
+          sbt release-hotfix
+
+      - name: Push changes
+        uses: ad-m/github-push-action@master
+        with:
+          github_token: ${{ secrets.SYSADMIN_PAT }}
+          branch: ${{ github.ref }}
+          tags: true
+          force: true
+
+      - name: Extract latest version
+        run: echo "VERSION=`echo $(git describe --tags $(git rev-list --tags --max-count=1))`" >> $GITHUB_ENV
+
+      - name: Extract previous version
+        run: echo "PREVIOUS=`echo $(git describe --always --abbrev=0 --tags $(git describe --tags $(git rev-list --tags --max-count=1))^)`" >> $GITHUB_ENV
+
+      - name: Create Hotfix Release
+        uses: aaiezza/create-release@v1.0.0
+        with:
+          release_branch: ${{ env.VERSION }}
+          tag: ${{ env.VERSION }}
+          name: ${{ env.VERSION }}
+          message: "* [HOTFIX] - Aplicando correcciones urgentes a la version ${{ env.PREVIOUS }}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.SYSADMIN_PAT }}
+
+      - name: PR to main
+        uses: vsoch/pull-request-action@1.0.18
+        env:
+          GITHUB_TOKEN: ${{ secrets.SYSADMIN_PAT }}
+          ULL_REQUEST_FROM_BRANCH: ${{ github.ref }}
+          PULL_REQUEST_BRANCH: "main"
+          PULL_REQUEST_TITLE: "[hotfix] Update main from ${{ env.VERSION }}"
+          ACTIONS_ALLOW_UNSECURE_COMMANDS: 'true'
