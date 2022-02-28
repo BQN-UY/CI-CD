@@ -1,0 +1,65 @@
+name: start-hotfix
+
+on:
+  workflow_call:
+    inputs:
+      git-tag-ref:
+        description: Tag (latest, previous or v#.#.#)
+        required: true
+        default: latest
+        type: string
+      git-hotfix-ref:
+        description: Hotfix Name
+        required: false
+        type: string
+    secrets:
+      SYSADMIN_PAT:
+        required: true
+
+
+jobs:
+  start-hotfix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Clone Repository
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.SYSADMIN_PAT }}
+
+      - name: Set latest version
+        if: inputs.git-tag-ref == 'latest'
+        run: echo "VERSION=`echo $(git describe --tags $(git rev-list --tags --max-count=1))`" >> $GITHUB_ENV
+
+      - name: Set previous version
+        if: inputs.git-tag-ref == 'previous'
+        run: echo "VERSION=`echo $(git describe --always --abbrev=0 --tags $(git describe --tags $(git rev-list --tags --max-count=1))^)`" >> $GITHUB_ENV
+
+      - name: Set custom version
+        if: inputs.git-tag-ref != 'latest' && inputs.git-tag-ref != 'previous'
+        run: echo "VERSION=`echo ${{ inputs.git-tag-ref }}`" >> $GITHUB_ENV
+
+      - name: Create and push branch(es)
+        run: |
+          git config --global user.name github-actions
+          git config --global user.email github-actions@github.com
+          version=${{ env.VERSION }}
+          [[ "$version" =~ (.*[^0-9])([0-9]+)$ ]] && newVersion="${BASH_REMATCH[1]}$((${BASH_REMATCH[2]} + 1))"
+          git checkout -b $newVersion $version
+          search=${version:1}
+          replace=${newVersion:1}
+          sed -i "s/$search/$replace/" version.sbt
+          git add -A
+          git commit -m "new hotfix ($version => $newVersion)"
+          git push --set-upstream origin refs/heads/$newVersion:refs/heads/$newVersion
+          hotfix=${{ inputs.git-hotfix-ref }}
+          if [[ -z "$hotfix" ]]; then
+             echo "No es necesario crear hotfix branch"
+          else
+             git checkout -b $hotfix $newVersion
+             git push --set-upstream origin refs/heads/$hotfix:refs/heads/$hotfix
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.SYSADMIN_PAT }}
+
