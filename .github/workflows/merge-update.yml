@@ -1,0 +1,32 @@
+name: merge-update
+
+on:
+  workflow_call:
+    secrets:
+      SYSADMIN_PAT:
+        required: true
+
+jobs:
+  labeler:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Label the PR action
+        uses: TimonVS/pr-labeler-action@v3
+        with:
+          configuration-path: .github/labeler.yml
+        env:
+          GITHUB_TOKEN: ${{ secrets.SYSADMIN_PAT }}
+
+  merge-update:
+    if: startsWith(github.event.pull_request.head.ref, 'update') &&  github.actor == 'bqn-sysadmin'
+    needs: [ labeler ]
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Merge PR with Minor Update
+        uses: desbo/merge-pr-action@v0
+        with:
+          GITHUB_TOKEN: ${{ secrets.SYSADMIN_PAT }}
+          ALLOWED_UPDATE: minor
+          MERGE_METHOD: squash
