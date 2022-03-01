@@ -23,7 +23,13 @@ on:
 
 
 jobs:
+  ci:
+    uses: BQN-UY/CI-CD/.github/workflows/scala-ci.yml@main
+    secrets:
+      SYSADMIN_PAT: ${{ secrets.SYSADMIN_PAT }}
+
   testing:
+    needs: [ci]
     if: inputs.environment == 'testing'
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -55,7 +61,7 @@ jobs:
           versionString=$(awk '/ThisBuild \/ version := /{print $NF}' version.sbt)
           echo "VERSION=`echo ${versionString:1:-1}`" >> $GITHUB_ENV
 
-      - name: Storage Package War
+      - name: Storage Testing War
         uses: Pendect/action-rsyncer@v1.1.0
         env:
           DEPLOY_KEY: ${{secrets.DEPLOY_KEY}}
