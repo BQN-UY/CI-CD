@@ -25,8 +25,8 @@ jobs:
       - name: Clone Repository
         uses: actions/checkout@v2
         with:
-          fetch-depth: 0
           token: ${{ secrets.SYSADMIN_PAT }}
+          fetch-depth: 0
 
       - name: Set latest version
         if: inputs.git-tag-ref == 'latest'

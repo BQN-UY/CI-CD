@@ -23,35 +23,15 @@ on:
 
 
 jobs:
-  ci:
-    uses: BQN-UY/CI-CD/.github/workflows/scala-ci.yml@main
-    secrets:
-      SYSADMIN_PAT: ${{ secrets.SYSADMIN_PAT }}
-
   testing:
-    needs: [ci]
     if: inputs.environment == 'testing'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Clone Repository
-        uses: actions/checkout@v2
-
-      - name: Set up JDK 1.8
-        uses: actions/setup-java@v2
+      - name: Checkout / Setup JDK 8 / sbt-cache
+        uses: BQN-UY/action-checkout-jdk8-sbt-cache@main
         with:
-          distribution: 'adopt'
-          java-version: '8'
-
-      - name: Cache sbt
-        uses: actions/cache@v2
-        with:
-          path: |
-            ~/.sbt
-            ~/.ivy2/cache
-            ~/.coursier
-            ~/.cache/coursier
-          key: sbt-cache-${{ runner.os }}-${{ matrix.target-platform }}-${{ hashFiles('project/build.properties') }}
+          token: ${{ secrets.SYSADMIN_PAT }}
 
       - name: Build war
         run: sbt package
