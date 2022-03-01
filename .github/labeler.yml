@@ -1,4 +1,0 @@
-feature: [ 'feature/*', 'feat/*' ]
-bugfix: [ 'bugfix/*', 'hotfix/*' ]
-update: [ 'update/*', 'renovate/*' ]
-skip-changelog: [ 'v*' ]

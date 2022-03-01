@@ -1,0 +1,24 @@
+name: remove-old-artifacts
+
+on:
+  workflow_call:
+    inputs:
+      age:
+        required: false
+        type: string
+        default: '1 week'
+      skip-recent:
+        required: false
+        type: number
+        default: 1
+
+jobs:
+  remove-old-artifacts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Remove old artifacts
+        uses: c-hive/gha-remove-artifacts@v1
+        with:
+          age: ${{ inputs.age }}
+          skip-recent: ${{ inputs.skip-recent }}
