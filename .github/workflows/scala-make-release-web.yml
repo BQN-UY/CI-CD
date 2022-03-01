@@ -1,0 +1,171 @@
+name: scala-make-release-web
+
+on:
+  workflow_call:
+    inputs:
+      name:
+        description: name
+        required: true
+        type: string
+      deploy-staging:
+        description: deploy-staging
+        required: true
+        type: string
+      deploy-production:
+        description: deploy-production
+        required: true
+        type: string
+    secrets:
+      SYSADMIN_PAT:
+        required: true
+      DEPLOY_KEY:
+        required: true
+      DEPLOY_IP:
+        required: true
+      DEPLOY_PORT:
+        required: true
+
+jobs:
+  default-release:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout / Setup JDK 8 / sbt-cache
+        uses: BQN-UY/action-checkout-jdk8-sbt-cache@main
+        with:
+          token: ${{ secrets.SYSADMIN_PAT }}
+          fetch-depth: '0'
+
+      - name: Release
+        run: |
+          git config --global user.name github-actions
+          git config --global user.email github-actions@github.com
+          sbt "release with-defaults"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: ${{inputs.name}}
+          path: "./target/${{inputs.name}}.war"
+
+  hotfix-release:
+    if: startsWith(github.ref, 'refs/heads/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout / Setup JDK 8 / sbt-cache
+        uses: BQN-UY/action-checkout-jdk8-sbt-cache@main
+        with:
+          token: ${{ secrets.SYSADMIN_PAT }}
+          fetch-depth: '0'
+
+      - name: Release Hotfix
+        run: |
+          git config --global user.name github-actions
+          git config --global user.email github-actions@github.com
+          sbt release-hotfix
+
+      - name: Push changes
+        uses: ad-m/github-push-action@master
+        with:
+          github_token: ${{ secrets.SYSADMIN_PAT }}
+          branch: ${{ github.ref }}
+          tags: true
+          force: true
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: ${{inputs.name}}
+          path: "./target/${{inputs.name}}.war"
+
+      - name: PR to main
+        uses: vsoch/pull-request-action@1.0.18
+        env:
+          GITHUB_TOKEN: ${{ secrets.SYSADMIN_PAT }}
+          ULL_REQUEST_FROM_BRANCH: ${{ github.ref }}
+          PULL_REQUEST_BRANCH: "main"
+          PULL_REQUEST_TITLE: "[hotfix] Update main from ${{ env.VERSION }}"
+          PULL_REQUEST_BODY: "**ALERTA**: Siempre que se resuelva conflictos se debe aceptar la version **#.#.#-SNAPSHOT** de main"
+          ACTIONS_ALLOW_UNSECURE_COMMANDS: 'true'
+
+
+  deploy:
+    runs-on: ubuntu-latest
+    if: always() && contains(join(needs.*.result, ','), 'success')
+    needs: [ default-release, hotfix-release ]
+    timeout-minutes: 10
+    steps:
+      - name: Checkout / Setup JDK 8 / sbt-cache
+        uses: BQN-UY/action-checkout-jdk8-sbt-cache@main
+        with:
+          token: ${{ secrets.SYSADMIN_PAT }}
+          fetch-depth: '0'
+
+      - name: Extract latest version
+        run: echo "VERSION=`echo $(git describe --tags $(git rev-list --tags --max-count=1))`" >> $GITHUB_ENV
+
+      - name: Publish release notes
+        uses: release-drafter/release-drafter@v5
+        with:
+          config-name: release-drafter.yml
+          publish: true
+          prerelease: false
+          name: "${{ env.VERSION }}"
+          tag: "${{ env.VERSION }}"
+          version: "${{ env.VERSION }}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: ${{inputs.name}}
+          path: target
+
+      - name: Storage staging war
+        if: inputs.deploy-staging == 'true'
+        uses: Pendect/action-rsyncer@v1.1.0
+        env:
+          DEPLOY_KEY: ${{secrets.DEPLOY_KEY}}
+        with:
+          flags: '-avz --delete'
+          options: ''
+          ssh_options: '-p ${{secrets.DEPLOY_PORT}}'
+          src: 'target/${{inputs.name}}.war'
+          dest: 'github@${{secrets.DEPLOY_IP}}:/opt/publisher/staging/${{inputs.name}}-${{env.VERSION}}.war'
+#          dest: 'github@${{secrets.DEPLOY_IP}}:/opt/publisher/staging/${{inputs.name}}/${{inputs.name}}-${{env.VERSION}}.war'
+
+      #      TODO: Entender si es con esto o disparar algo de jenkins
+      #      - name: Deploy staging dispatch
+      #        if: inputs.deploy-staging == 'true'
+      #        uses: peter-evans/repository-dispatch@v1
+      #        with:
+      #          token: ${{ secrets.SYSADMIN_PAT }}
+      #          repository: BQN-UY/CI-CD
+      #          event-type: deployer-auto
+      #          client-payload: '{"repo": "spa", "version": "${{ env.VERSION }}", "environment": "TESTING", "installation": "DEFAULT"}'
+
+      - name: Storage production war
+        if: inputs.deploy-production == 'true'
+        uses: Pendect/action-rsyncer@v1.1.0
+        env:
+          DEPLOY_KEY: ${{secrets.DEPLOY_KEY}}
+        with:
+          flags: '-avz --delete'
+          options: ''
+          ssh_options: '-p ${{secrets.DEPLOY_PORT}}'
+          src: 'target/${{inputs.name}}.war'
+          dest: 'github@${{secrets.DEPLOY_IP}}:/opt/publisher/production/${{inputs.name}}-${{env.VERSION}}.war'
+#          dest: 'github@${{secrets.DEPLOY_IP}}:/opt/publisher/production/${{inputs.name}}/${{inputs.name}}-${{env.VERSION}}.war'
+
+      #      TODO: Entender si es con esto o disparar algo de jenkins
+      #      - name: Deploy production dispatch
+      #        if: inputs.deploy-production == 'true'
+      #        uses: peter-evans/repository-dispatch@v1
+      #        with:
+      #          token: ${{ secrets.SYSADMIN_PAT }}
+      #          repository: BQN-UY/CI-CD
+      #          event-type: deployer-auto
+      #          client-payload: '{"repo": "spa", "version": "${{ env.VERSION }}", "environment": "TESTING", "installation": "DEFAULT"}'

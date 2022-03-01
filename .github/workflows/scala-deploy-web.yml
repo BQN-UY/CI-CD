@@ -7,9 +7,9 @@ on:
         type: string
         description: environment
         required: true
-      artifact:
+      name:
         type: string
-        description: artifact
+        description: name
         required: true
     secrets:
       SYSADMIN_PAT:
@@ -49,8 +49,9 @@ jobs:
           flags: '-avz --delete'
           options: ''
           ssh_options: '-p ${{secrets.DEPLOY_PORT}}'
-          src: 'target/${{inputs.artifact}}.war'
-          dest: 'github@${{secrets.DEPLOY_IP}}:/opt/publisher/testing/${{inputs.artifact}}-${{env.VERSION}}.war'
+          src: 'target/${{inputs.name}}.war'
+          dest: 'github@${{secrets.DEPLOY_IP}}:/opt/publisher/testing/${{inputs.name}}-${{env.VERSION}}.war'
+#          dest: 'github@${{secrets.DEPLOY_IP}}:/opt/publisher/testing/${{inputs.name}}/${{inputs.name}}-${{env.VERSION}}.war'
 
 #      TODO: Entender si es con esto o disparar algo de jenkins
 #      - name: Deploy Testing Dispatch
