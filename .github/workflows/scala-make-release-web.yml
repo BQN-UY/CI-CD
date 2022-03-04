@@ -93,7 +93,7 @@ jobs:
 
   deploy:
     runs-on: ubuntu-latest
-    if: always() && contains(join(needs.*.result, ','), 'success')
+    if: always() && contains(join(needs.*.result, ','), 'success') && (inputs.deploy-staging == 'true' || inputs.deploy-production == 'true')
     needs: [ default-release, hotfix-release ]
     timeout-minutes: 10
     steps:
