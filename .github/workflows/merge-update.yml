@@ -8,7 +8,7 @@ on:
 
 jobs:
   labeler:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     timeout-minutes: 3
     steps:
       - name: Label the PR action
@@ -21,7 +21,7 @@ jobs:
   merge-update:
     if: startsWith(github.event.pull_request.head.ref, 'update') &&  github.actor == 'bqn-sysadmin'
     needs: [ labeler ]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     timeout-minutes: 3
     steps:
       - name: Merge PR with Minor Update

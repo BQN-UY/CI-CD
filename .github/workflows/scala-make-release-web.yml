@@ -28,7 +28,7 @@ on:
 jobs:
   default-release:
     if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     timeout-minutes: 20
     steps:
       - name: Checkout / Setup JDK 8 / sbt-cache
@@ -51,7 +51,7 @@ jobs:
 
   hotfix-release:
     if: startsWith(github.ref, 'refs/heads/v')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     timeout-minutes: 10
     steps:
       - name: Checkout / Setup JDK 8 / sbt-cache
@@ -92,7 +92,7 @@ jobs:
 
 
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     if: always() && contains(join(needs.*.result, ','), 'success') && (inputs.deploy-staging == 'true' || inputs.deploy-production == 'true')
     needs: [ default-release, hotfix-release ]
     timeout-minutes: 10

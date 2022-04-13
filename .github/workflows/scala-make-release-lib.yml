@@ -12,12 +12,12 @@ on:
 
 jobs:
   check-changes:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     name: changed-files
     outputs:
       changed-scala-files: ${{ steps.changed-scala-files.outputs.any_changed }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           fetch-depth: 2
 
@@ -32,7 +32,7 @@ jobs:
   make-release:
     needs: check-changes
     if: (needs.check-changes.outputs.changed-scala-files == 'true' || inputs.force-release == 'true') && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - name: Checkout / Setup JDK 8 / sbt-cache
         uses: BQN-UY/action-checkout-jdk8-sbt-cache@main
@@ -62,7 +62,7 @@ jobs:
   make-release-hotfix:
     needs: check-changes
     if: (needs.check-changes.outputs.changed-scala-files == 'true' || inputs.force-release == 'true') && startsWith(github.ref, 'refs/heads/v')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     timeout-minutes: 10
     steps:
       - name: Checkout / Setup JDK 8 / sbt-cache

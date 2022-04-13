@@ -8,7 +8,7 @@ on:
 
 jobs:
   labeler:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     timeout-minutes: 3
     steps:
       - name: Label the PR action
@@ -19,11 +19,11 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.SYSADMIN_PAT }}
 
   u-tests:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     timeout-minutes: 20
     steps:
-      - name: Checkout / Setup JDK 8 / sbt-cache
-        uses: BQN-UY/action-checkout-jdk8-sbt-cache@main
+      - name: Checkout / Setup JDK / sbt-cache
+        uses: actions/checkout_jdk11_sbt-cache
         with:
           token: ${{ secrets.SYSADMIN_PAT }}
 
@@ -41,7 +41,7 @@ jobs:
   merge-update:
     if: startsWith(github.event.pull_request.head.ref, 'update') &&  github.actor == 'bqn-sysadmin'
     needs: [ labeler, u-tests ]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     timeout-minutes: 3
     steps:
       - name: Merge PR with Minor Update
