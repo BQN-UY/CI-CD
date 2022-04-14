@@ -9,7 +9,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout / Setup JDK / sbt-cache
-        uses: actions/checkout_jdk_sbt-cache@main
+        uses: ./actions/checkout_jdk_sbt-cache
         with:
           token: ${{ secrets.SYSADMIN_PAT }}
 
