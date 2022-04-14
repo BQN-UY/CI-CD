@@ -5,14 +5,13 @@ on:
 
 jobs:
   publish-snapshot:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Checkout / Setup JDK 8 / sbt-cache
-        uses: BQN-UY/action-checkout-jdk8-sbt-cache@main
+      - name: Checkout / Setup JDK / sbt-cache
+        uses: actions/checkout_jdk_sbt-cache
         with:
           token: ${{ secrets.SYSADMIN_PAT }}
-          fetch-depth: '0'
 
       - name: Publish Snapshot
         run: sbt publish
