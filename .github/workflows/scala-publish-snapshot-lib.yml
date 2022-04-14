@@ -8,11 +8,21 @@ on:
         description: 'jdk version'
         type: string
         default: '8'
+    secrets:
+      SYSADMIN_PAT:
+        required: true
+      NEXUS_USER:
+        required: true
+      NEXUS_PASSWORD:
+        required: true
 
 jobs:
   publish-snapshot:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      NEXUS_USER: ${{ secrets.NEXUS_USER }}
+      NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
     steps:
       - name: Checkout / Setup JDK / sbt-cache
         uses: BQN-UY/action_checkout_jdk_sbt-cache@main

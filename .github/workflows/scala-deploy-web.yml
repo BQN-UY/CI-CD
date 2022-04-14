@@ -19,6 +19,10 @@ on:
     secrets:
       SYSADMIN_PAT:
         required: true
+      NEXUS_USER:
+        required: true
+      NEXUS_PASSWORD:
+        required: true
       DEPLOY_KEY:
         required: true
       DEPLOY_IP:
@@ -32,6 +36,9 @@ jobs:
     if: inputs.environment == 'testing'
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      NEXUS_USER: ${{ secrets.NEXUS_USER }}
+      NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
     steps:
       - name: Checkout / Setup JDK / sbt-cache
         uses: BQN-UY/action_checkout_jdk_sbt-cache@main
