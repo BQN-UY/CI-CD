@@ -3,6 +3,11 @@ name: scala-make-release-lib
 on:
   workflow_call:
     inputs:
+      jdk-version:
+        required: false
+        description: 'jdk version'
+        type: string
+        default: '8'
       force-release:
         required: false
         type: string
@@ -34,10 +39,11 @@ jobs:
     if: (needs.check-changes.outputs.changed-scala-files == 'true' || inputs.force-release == 'true') && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout / Setup JDK 8 / sbt-cache
-        uses: ./actions/checkout_jdk_sbt-cache
+      - name: Checkout / Setup JDK / sbt-cache
+        uses: ./.github/actions/checkout_jdk_sbt-cache
         with:
           token: ${{ secrets.SYSADMIN_PAT }}
+          jdk-version: ${{ inputs.jdk-version }}
 
       - name: Release
         run: |
@@ -58,17 +64,18 @@ jobs:
           version: "${{ env.VERSION }}"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          
+
   make-release-hotfix:
     needs: check-changes
     if: (needs.check-changes.outputs.changed-scala-files == 'true' || inputs.force-release == 'true') && startsWith(github.ref, 'refs/heads/v')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Checkout / Setup JDK 8 / sbt-cache
-        uses: ./actions/checkout_jdk_sbt-cache
+      - name: Checkout / Setup JDK / sbt-cache
+        uses: ./.github/actions/checkout_jdk_sbt-cache
         with:
           token: ${{ secrets.SYSADMIN_PAT }}
+          jdk-version: ${{ inputs.jdk-version }}
 
       - name: Release Hotfix
         run: |

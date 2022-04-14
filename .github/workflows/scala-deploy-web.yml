@@ -3,6 +3,11 @@ name: scala-deploy-web
 on:
   workflow_call:
     inputs:
+      jdk-version:
+        required: false
+        description: 'jdk version'
+        type: string
+        default: '8'
       environment:
         type: string
         description: environment
@@ -28,10 +33,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Checkout / Setup JDK 8 / sbt-cache
-        uses: ./actions/checkout_jdk_sbt-cache
+      - name: Checkout / Setup JDK / sbt-cache
+        uses: ./.github/actions/checkout_jdk_sbt-cache
         with:
           token: ${{ secrets.SYSADMIN_PAT }}
+          jdk-version: ${{ inputs.jdk-version }}
 
       - name: Build war
         run: sbt package
