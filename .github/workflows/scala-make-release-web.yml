@@ -3,6 +3,11 @@ name: scala-make-release-web
 on:
   workflow_call:
     inputs:
+      jdk-version:
+        required: false
+        description: 'jdk version'
+        type: string
+        default: '8'
       name:
         description: name
         required: true

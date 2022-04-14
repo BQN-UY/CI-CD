@@ -2,6 +2,12 @@ name: scala-publish-snapshot-lib
 
 on:
   workflow_call:
+    inputs:
+      jdk-version:
+        required: false
+        description: 'jdk version'
+        type: string
+        default: '8'
 
 jobs:
   publish-snapshot:
