@@ -29,7 +29,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Checkout / Setup JDK / sbt-cache
-        uses: ./.github/actions/checkout_jdk_sbt-cache
+        uses: BQN-UY/action_checkout_jdk_sbt-cache@main
         with:
           token: ${{ secrets.SYSADMIN_PAT }}
           jdk-version: ${{ inputs.jdk-version }}
