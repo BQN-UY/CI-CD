@@ -63,7 +63,7 @@ jobs:
           options: ''
           ssh_options: '-p ${{secrets.DEPLOY_PORT}}'
           src: 'target/${{github.event.inputs.name}}.war'
-          dest: 'github@${{secrets.DEPLOY_IP}}:/opt/publisher/testing/${{github.event.inputs.name}}-${{env.VERSION}}.war'
+          dest: 'github@${{secrets.DEPLOY_IP}}:/opt/publisher/testing/${{github.event.inputs.name}}/${{github.event.inputs.name}}-${{env.VERSION}}.war'
 #          dest: 'github@${{secrets.DEPLOY_IP}}:/opt/publisher/testing/${{github.event.inputs.name}}/${{github.event.inputs.name}}-${{env.VERSION}}.war'
 
 #      TODO: Entender si es con esto o disparar algo de jenkins
