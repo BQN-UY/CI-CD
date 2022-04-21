@@ -64,16 +64,20 @@ jobs:
           ssh_options: '-p ${{secrets.DEPLOY_PORT}}'
           src: 'target/${{github.event.inputs.name}}.war'
           dest: 'github@${{secrets.DEPLOY_IP}}:/opt/publisher/testing/${{github.event.inputs.name}}/${{github.event.inputs.name}}-${{env.VERSION}}.war'
-#          dest: 'github@${{secrets.DEPLOY_IP}}:/opt/publisher/testing/${{github.event.inputs.name}}/${{github.event.inputs.name}}-${{env.VERSION}}.war'
-
-#      TODO: Entender si es con esto o disparar algo de jenkins
-#      - name: Deploy Testing Dispatch
-#        uses: peter-evans/repository-dispatch@v1
-#        with:
-#          token: ${{ secrets.SYSADMIN_PAT }}
-#          repository: BQN-UY/CI-CD
-#          event-type: deployer-auto
-#          client-payload: '{"repo": "spa", "version": "${{ env.VERSION }}", "environment": "TESTING", "installation": "DEFAULT"}'
+#          dest: 'github@${{secrets.DEPLOY_IP}}:/opt/publisher/testing/${{github.event.inputs.name}}/${{github.event.inputs.name}}-${{env.VERSION}}.war
+      - name: executing remote ssh commands using ssh key
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.TESTING_DEPLOY_IP }}
+          username: github
+          key: ${{ secrets.TESTING_DEPLOY_KEY }}
+          port: ${{ secrets.TESTING_DEPLOY_PORT }}
+          script: |
+            json=""
+            # Curl para el crumbs
+            crumb=$(curl -u "github:${{ secrets.JENKINS_TOKEN_PRODUCTION }}" -s 'http://jenkins.soporte/crumbIssuer/api/json')
+            # Curl para ejecutar
+            curl -u "github:${{ secrets.JENKINS_TOKEN_PRODUCTION }}" -H "$crumb" -X POST 'http://jenkins.soporte/job/Soporte/job/DeployApp/buildWithParameters?SISTEMA=${{github.event.inputs.name}}&ENVIRONMENT=testing&VERSION=${{github.event.inputs.name}}-${{env.VERSION}}.war&INSTALLATION=${{github.event.inputs.name}}'
 
 
 
