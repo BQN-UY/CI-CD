@@ -33,7 +33,7 @@ on:
 
 jobs:
   testing:
-    if: inputs.environment == 'testing'
+    if: github.event.inputs.environment == 'testing'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
@@ -44,7 +44,7 @@ jobs:
         uses: BQN-UY/action_checkout_jdk_sbt-cache@main
         with:
           token: ${{ secrets.SYSADMIN_PAT }}
-          jdk-version: ${{ inputs.jdk-version }}
+          jdk-version: ${{ github.event.inputs.jdk-version }}
 
       - name: Build war
         run: sbt package
@@ -62,9 +62,9 @@ jobs:
           flags: '-avz --delete'
           options: ''
           ssh_options: '-p ${{secrets.DEPLOY_PORT}}'
-          src: 'target/${{inputs.name}}.war'
-          dest: 'github@${{secrets.DEPLOY_IP}}:/opt/publisher/testing/${{inputs.name}}-${{env.VERSION}}.war'
-#          dest: 'github@${{secrets.DEPLOY_IP}}:/opt/publisher/testing/${{inputs.name}}/${{inputs.name}}-${{env.VERSION}}.war'
+          src: 'target/${{github.event.inputs.name}}.war'
+          dest: 'github@${{secrets.DEPLOY_IP}}:/opt/publisher/testing/${{github.event.inputs.name}}-${{env.VERSION}}.war'
+#          dest: 'github@${{secrets.DEPLOY_IP}}:/opt/publisher/testing/${{github.event.inputs.name}}/${{github.event.inputs.name}}-${{env.VERSION}}.war'
 
 #      TODO: Entender si es con esto o disparar algo de jenkins
 #      - name: Deploy Testing Dispatch
