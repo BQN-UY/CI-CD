@@ -52,7 +52,7 @@ jobs:
         uses: BQN-UY/action_checkout_jdk_sbt-cache@main
         with:
           token: ${{ secrets.SYSADMIN_PAT }}
-          jdk-version: ${{ github.event.inputs.jdk-version }}
+          jdk-version: ${{ inputs.jdk-version }}
 
       - name: Build war
         run: sbt package
@@ -70,8 +70,8 @@ jobs:
           flags: '-avz --delete'
           options: ''
           ssh_options: '-p ${{secrets.DEPLOY_PORT}}'
-          src: 'target/${{github.event.inputs.name}}.war'
-          dest: 'github@${{secrets.DEPLOY_IP}}:${{ secrets.PUBLISHER_PATH }}/${{github.event.inputs.environment}}/${{github.event.inputs.name}}/${{github.event.inputs.name}}-${{env.VERSION}}.war'
+          src: 'target/${{inputs.name}}.war'
+          dest: 'github@${{secrets.DEPLOY_IP}}:${{ secrets.PUBLISHER_PATH }}/${{inputs.environment}}/${{inputs.name}}/${{inputs.name}}-${{env.VERSION}}.war'
 
       - name: executing remote ssh commands using ssh key
         uses: appleboy/ssh-action@master
@@ -84,7 +84,7 @@ jobs:
             # Curl para el crumbs
             crumb=$(curl -u "${{ secrets.JENKINS_USER }}:${{ secrets.JENKINS_TOKEN }}" -s '${{ secrets.JENKINS_URL }}/crumbIssuer/api/json')
             # Curl para ejecutar
-            curl -u "${{ secrets.JENKINS_USER }}:${{ secrets.JENKINS_TOKEN }}" -H "$crumb" -X POST '${{ secrets.JENKINS_URL }}/${{ secrets.JENKINS_DEPLOY_URL }}/buildWithParameters?SISTEMA=${{github.event.inputs.name}}&ENVIRONMENT=testing&VERSION=${{github.event.inputs.name}}-${{env.VERSION}}.war&INSTALLATION=${{github.event.inputs.name}}'
+            curl -u "${{ secrets.JENKINS_USER }}:${{ secrets.JENKINS_TOKEN }}" -H "$crumb" -X POST '${{ secrets.JENKINS_URL }}/${{ secrets.JENKINS_DEPLOY_URL }}/buildWithParameters?SISTEMA=${{inputs.name}}&ENVIRONMENT=testing&VERSION=${{inputs.name}}-${{env.VERSION}}.war&INSTALLATION=${{inputs.name}}'
 
 
 
