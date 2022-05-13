@@ -33,7 +33,6 @@ on:
 
 jobs:
   testing:
-    #if: github.event.inputs.environment == 'testing'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
@@ -64,7 +63,7 @@ jobs:
           ssh_options: '-p ${{secrets.DEPLOY_PORT}}'
           src: 'target/${{github.event.inputs.name}}.war'
           dest: 'github@${{secrets.DEPLOY_IP}}:/opt/publisher/${{github.event.inputs.environment}}/${{github.event.inputs.name}}/${{github.event.inputs.name}}-${{env.VERSION}}.war'
-#          dest: 'github@${{secrets.DEPLOY_IP}}:/opt/publisher/testing/${{github.event.inputs.name}}/${{github.event.inputs.name}}-${{env.VERSION}}.war
+
       - name: executing remote ssh commands using ssh key
         uses: appleboy/ssh-action@master
         with:
