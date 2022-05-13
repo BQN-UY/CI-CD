@@ -33,7 +33,7 @@ on:
 
 jobs:
   testing:
-    if: github.event.inputs.environment == 'testing'
+    #if: github.event.inputs.environment == 'testing'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
@@ -63,7 +63,7 @@ jobs:
           options: ''
           ssh_options: '-p ${{secrets.DEPLOY_PORT}}'
           src: 'target/${{github.event.inputs.name}}.war'
-          dest: 'github@${{secrets.DEPLOY_IP}}:/opt/publisher/testing/${{github.event.inputs.name}}/${{github.event.inputs.name}}-${{env.VERSION}}.war'
+          dest: 'github@${{secrets.DEPLOY_IP}}:/opt/publisher/${{github.event.inputs.environment}}/${{github.event.inputs.name}}/${{github.event.inputs.name}}-${{env.VERSION}}.war'
 #          dest: 'github@${{secrets.DEPLOY_IP}}:/opt/publisher/testing/${{github.event.inputs.name}}/${{github.event.inputs.name}}-${{env.VERSION}}.war
       - name: executing remote ssh commands using ssh key
         uses: appleboy/ssh-action@master
@@ -73,7 +73,6 @@ jobs:
           key: ${{ secrets.TESTING_DEPLOY_KEY }}
           port: ${{ secrets.TESTING_DEPLOY_PORT }}
           script: |
-            json=""
             # Curl para el crumbs
             crumb=$(curl -u "github:${{ secrets.JENKINS_TOKEN_PRODUCTION }}" -s 'http://jenkins.soporte/crumbIssuer/api/json')
             # Curl para ejecutar
