@@ -23,6 +23,8 @@ on:
         required: true
       NEXUS_PASSWORD:
         required: true
+      DEPLOY_USER:
+        required: true
       DEPLOY_KEY:
         required: true
       DEPLOY_IP:
@@ -71,13 +73,13 @@ jobs:
           options: ''
           ssh_options: '-p ${{secrets.DEPLOY_PORT}}'
           src: 'target/${{inputs.name}}.war'
-          dest: 'github@${{secrets.DEPLOY_IP}}:${{ secrets.PUBLISHER_PATH }}/${{inputs.environment}}/${{inputs.name}}/${{inputs.name}}-${{env.VERSION}}.war'
+          dest: '${{ secrets.DEPLOY_USER }}@${{secrets.DEPLOY_IP}}:${{ secrets.PUBLISHER_PATH }}/${{inputs.environment}}/${{inputs.name}}/${{inputs.name}}-${{env.VERSION}}.war'
 
       - name: executing remote ssh commands using ssh key
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.DEPLOY_IP }}
-          username: github
+          username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_KEY }}
           port: ${{ secrets.DEPLOY_PORT }}
           script: |
