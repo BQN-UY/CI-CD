@@ -29,7 +29,16 @@ on:
         required: true
       DEPLOY_PORT:
         required: true
-
+      JENKINS_URL:
+        required: true
+      JENKINS_DEPLOY_JOB:
+        required: true
+      JENKINS_USER:
+        required: true
+      JENKINS_TOKEN:
+        required: true
+      PUBLISHER_PATH:
+        required: true
 
 jobs:
   deploy:
@@ -62,20 +71,20 @@ jobs:
           options: ''
           ssh_options: '-p ${{secrets.DEPLOY_PORT}}'
           src: 'target/${{github.event.inputs.name}}.war'
-          dest: 'github@${{secrets.DEPLOY_IP}}:/opt/publisher/${{github.event.inputs.environment}}/${{github.event.inputs.name}}/${{github.event.inputs.name}}-${{env.VERSION}}.war'
+          dest: 'github@${{secrets.DEPLOY_IP}}:${{ secrets.PUBLISHER_PATH }}/${{github.event.inputs.environment}}/${{github.event.inputs.name}}/${{github.event.inputs.name}}-${{env.VERSION}}.war'
 
       - name: executing remote ssh commands using ssh key
         uses: appleboy/ssh-action@master
         with:
-          host: ${{ secrets.TESTING_DEPLOY_IP }}
+          host: ${{ secrets.DEPLOY_IP }}
           username: github
-          key: ${{ secrets.TESTING_DEPLOY_KEY }}
-          port: ${{ secrets.TESTING_DEPLOY_PORT }}
+          key: ${{ secrets.DEPLOY_KEY }}
+          port: ${{ secrets.DEPLOY_PORT }}
           script: |
             # Curl para el crumbs
-            crumb=$(curl -u "github:${{ secrets.JENKINS_TOKEN_PRODUCTION }}" -s 'http://jenkins.soporte/crumbIssuer/api/json')
+            crumb=$(curl -u "${{ secrets.JENKINS_USER }}:${{ secrets.JENKINS_TOKEN }}" -s '${{ secrets.JENKINS_URL }}/crumbIssuer/api/json')
             # Curl para ejecutar
-            curl -u "github:${{ secrets.JENKINS_TOKEN_PRODUCTION }}" -H "$crumb" -X POST 'http://jenkins.soporte/job/Soporte/job/DeployApp/buildWithParameters?SISTEMA=${{github.event.inputs.name}}&ENVIRONMENT=testing&VERSION=${{github.event.inputs.name}}-${{env.VERSION}}.war&INSTALLATION=${{github.event.inputs.name}}'
+            curl -u "${{ secrets.JENKINS_USER }}:${{ secrets.JENKINS_TOKEN }}" -H "$crumb" -X POST '${{ secrets.JENKINS_URL }}/${{ secrets.JENKINS_DEPLOY_URL }}/buildWithParameters?SISTEMA=${{github.event.inputs.name}}&ENVIRONMENT=testing&VERSION=${{github.event.inputs.name}}-${{env.VERSION}}.war&INSTALLATION=${{github.event.inputs.name}}'
 
 
 
