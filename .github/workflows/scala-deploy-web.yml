@@ -4,10 +4,10 @@ on:
   workflow_call:
     inputs:
       jdk-version:
-        required: false
-        description: 'jdk version'
         type: string
+        description: 'jdk version'
         default: '8'
+        required: false
       environment:
         type: string
         description: environment
@@ -64,7 +64,7 @@ jobs:
           versionString=$(awk '/ThisBuild \/ version := /;{print $NF}' version.sbt)
           echo "VERSION=`echo ${versionString:1:-1}`" >> $GITHUB_ENV
 
-      - name: Storage Testing War
+      - name: Storage War
         uses: Pendect/action-rsyncer@v1.1.0
         env:
           DEPLOY_KEY: ${{secrets.DEPLOY_KEY}}
@@ -75,7 +75,7 @@ jobs:
           src: 'target/${{inputs.name}}.war'
           dest: '${{ secrets.DEPLOY_USER }}@${{secrets.DEPLOY_IP}}:${{ secrets.PUBLISHER_PATH }}/${{inputs.environment}}/${{inputs.name}}/${{inputs.name}}-${{env.VERSION}}.war'
 
-      - name: executing remote ssh commands using ssh key
+      - name: Executing deloy scritp
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.DEPLOY_IP }}
@@ -87,6 +87,3 @@ jobs:
             crumb=$(curl -u "${{ secrets.JENKINS_USER }}:${{ secrets.JENKINS_TOKEN }}" -s '${{ secrets.JENKINS_URL }}/crumbIssuer/api/json')
             # Curl para ejecutar
             curl -u "${{ secrets.JENKINS_USER }}:${{ secrets.JENKINS_TOKEN }}" -H "$crumb" -X POST '${{ secrets.JENKINS_URL }}/${{ secrets.JENKINS_DEPLOY_URL }}/buildWithParameters?SISTEMA=${{inputs.name}}&ENVIRONMENT=testing&VERSION=${{inputs.name}}-${{env.VERSION}}.war&INSTALLATION=${{inputs.name}}'
-
-
-
