@@ -56,7 +56,7 @@ jobs:
           sbt "release with-defaults"
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: ${{inputs.name}}
           path: "./target/${{inputs.name}}.war"
@@ -90,7 +90,7 @@ jobs:
           force: true
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: ${{inputs.name}}
           path: "./target/${{inputs.name}}.war"
