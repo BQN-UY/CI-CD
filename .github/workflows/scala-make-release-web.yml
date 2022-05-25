@@ -96,7 +96,7 @@ jobs:
           path: "./target/${{inputs.name}}.war"
 
       - name: PR to main
-        uses: vsoch/pull-request-action@1.0.18
+        uses: vsoch/pull-request-action@1.0.19
         env:
           GITHUB_TOKEN: ${{ secrets.SYSADMIN_PAT }}
           ULL_REQUEST_FROM_BRANCH: ${{ github.ref }}
