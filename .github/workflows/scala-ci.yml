@@ -51,6 +51,24 @@ jobs:
           check_name: u-tests
           github_token: ${{ secrets.GITHUB_TOKEN }}
           files: ./**/*UnitTest.xml
+                    
+  sonar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      SONARCLOUD_URL: ???
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    steps:
+      - name: Checkout / Setup JDK / sbt-cache
+        uses: BQN-UY/action_checkout_jdk_sbt-cache@main
+        with:
+          token: ${{ secrets.SYSADMIN_PAT }}
+          jdk-version: ${{ inputs.jdk-version }}
+          
+      - name: Sonar Publish Report
+        run: sbt -Dsonar.login=${{ secrets.SONAR_TOKEN }} sonar
+
+      - uses: sonarsource/sonarqube-quality-gate-action@master          
 
   merge-update:
     if: startsWith(github.event.pull_request.head.ref, 'update') &&  github.actor == 'bqn-sysadmin'
