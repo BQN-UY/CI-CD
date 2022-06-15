@@ -61,7 +61,7 @@ jobs:
 
       - name: Get current version
         run: |
-          versionString=$(awk '/ThisBuild \/ version := /;{print $NF}' version.sbt)
+          versionString=$(awk '/ThisBuild \/ version := /{print $NF}' version.sbt)
           echo "VERSION=`echo ${versionString:1:-1}`" >> $GITHUB_ENV
 
       - name: Storage War
