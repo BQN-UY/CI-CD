@@ -8,10 +8,6 @@ on:
         description: 'jdk version'
         default: '8'
         required: false
-      environment:
-        type: string
-        description: environment
-        required: true
       name:
         type: string
         description: name
