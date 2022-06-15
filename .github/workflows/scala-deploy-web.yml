@@ -73,9 +73,9 @@ jobs:
           options: ''
           ssh_options: '-p ${{secrets.DEPLOY_PORT}}'
           src: 'target/${{inputs.name}}.war'
-          dest: '${{ secrets.DEPLOY_USER }}@${{secrets.DEPLOY_IP}}:${{ secrets.PUBLISHER_PATH }}/${{inputs.environment}}/${{inputs.name}}/${{inputs.name}}-${{env.VERSION}}.war'
+          dest: '${{ secrets.DEPLOY_USER }}@${{secrets.DEPLOY_IP}}:${{ secrets.PUBLISHER_PATH }}/${{inputs.name}}/versiones/${{inputs.name}}-${{env.VERSION}}.war'
 
-      - name: Executing deloy scritp
+      - name: Executing deloy script
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.DEPLOY_IP }}
