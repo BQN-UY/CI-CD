@@ -12,14 +12,6 @@ on:
         description: name
         required: true
         type: string
-      deploy-staging:
-        description: deploy-staging
-        required: true
-        type: string
-      deploy-production:
-        description: deploy-production
-        required: true
-        type: string
     secrets:
       SYSADMIN_PAT:
         required: true
@@ -32,6 +24,16 @@ on:
       DEPLOY_IP:
         required: true
       DEPLOY_PORT:
+        required: true
+      JENKINS_URL:
+        required: true
+      JENKINS_DEPLOY_JOB:
+        required: true
+      JENKINS_USER:
+        required: true
+      JENKINS_TOKEN:
+        required: true
+      PUBLISHER_PATH:
         required: true
 
 jobs:
@@ -108,7 +110,7 @@ jobs:
 
   deploy:
     runs-on: ubuntu-latest
-    if: always() && contains(join(needs.*.result, ','), 'success') && (inputs.deploy-staging == 'true' || inputs.deploy-production == 'true')
+    if: always() && contains(join(needs.*.result, ','), 'success')
     needs: [ default-release, hotfix-release ]
     timeout-minutes: 10
     env:
@@ -142,8 +144,7 @@ jobs:
           name: ${{inputs.name}}
           path: target
 
-      - name: Storage staging war
-        if: inputs.deploy-staging == 'true'
+      - name: Storage War
         uses: Pendect/action-rsyncer@v1.1.0
         env:
           DEPLOY_KEY: ${{secrets.DEPLOY_KEY}}
@@ -152,38 +153,19 @@ jobs:
           options: ''
           ssh_options: '-p ${{secrets.DEPLOY_PORT}}'
           src: 'target/${{inputs.name}}.war'
-          dest: 'github@${{secrets.DEPLOY_IP}}:/opt/publisher/staging/${{inputs.name}}-${{env.VERSION}}.war'
-#          dest: 'github@${{secrets.DEPLOY_IP}}:/opt/publisher/staging/${{inputs.name}}/${{inputs.name}}-${{env.VERSION}}.war'
+          dest: '${{ secrets.DEPLOY_USER }}@${{secrets.DEPLOY_IP}}:${{ secrets.PUBLISHER_PATH }}/${{inputs.name}}/versiones/${{inputs.name}}-${{env.VERSION}}.war'
 
-      #      TODO: Entender si es con esto o disparar algo de jenkins
-      #      - name: Deploy staging dispatch
-      #        if: inputs.deploy-staging == 'true'
-      #        uses: peter-evans/repository-dispatch@v1
-      #        with:
-      #          token: ${{ secrets.SYSADMIN_PAT }}
-      #          repository: BQN-UY/CI-CD
-      #          event-type: deployer-auto
-      #          client-payload: '{"repo": "spa", "version": "${{ env.VERSION }}", "environment": "TESTING", "installation": "DEFAULT"}'
-
-      - name: Storage production war
-        if: inputs.deploy-production == 'true'
-        uses: Pendect/action-rsyncer@v1.1.0
-        env:
-          DEPLOY_KEY: ${{secrets.DEPLOY_KEY}}
+      - name: Executing deloy script
+        uses: appleboy/ssh-action@master
         with:
-          flags: '-avz --delete'
-          options: ''
-          ssh_options: '-p ${{secrets.DEPLOY_PORT}}'
-          src: 'target/${{inputs.name}}.war'
-          dest: 'github@${{secrets.DEPLOY_IP}}:/opt/publisher/production/${{inputs.name}}-${{env.VERSION}}.war'
-#          dest: 'github@${{secrets.DEPLOY_IP}}:/opt/publisher/production/${{inputs.name}}/${{inputs.name}}-${{env.VERSION}}.war'
+          host: ${{ secrets.DEPLOY_IP }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_KEY }}
+          port: ${{ secrets.DEPLOY_PORT }}
+          script: |
+            # Curl para el crumbs
+            crumb=$(curl -u "${{ secrets.JENKINS_USER }}:${{ secrets.JENKINS_TOKEN }}" -s '${{ secrets.JENKINS_URL }}/crumbIssuer/api/json')
+            # Curl para ejecutar
+            curl -u "${{ secrets.JENKINS_USER }}:${{ secrets.JENKINS_TOKEN }}" -H "$crumb" -X POST '${{ secrets.JENKINS_URL }}/${{ secrets.JENKINS_DEPLOY_JOB }}/buildWithParameters?SISTEMA=${{inputs.name}}&ENVIRONMENT=testing&VERSION=${{inputs.name}}-${{env.VERSION}}.war&INSTALLATION=${{inputs.name}}'
 
-      #      TODO: Entender si es con esto o disparar algo de jenkins
-      #      - name: Deploy production dispatch
-      #        if: inputs.deploy-production == 'true'
-      #        uses: peter-evans/repository-dispatch@v1
-      #        with:
-      #          token: ${{ secrets.SYSADMIN_PAT }}
-      #          repository: BQN-UY/CI-CD
-      #          event-type: deployer-auto
-      #          client-payload: '{"repo": "spa", "version": "${{ env.VERSION }}", "environment": "TESTING", "installation": "DEFAULT"}'
+
