@@ -134,7 +134,7 @@ jobs:
           name: ${{inputs.name}}
           path: target
 
-      - name: Storage staging war
+      - name: Storage War
         uses: Pendect/action-rsyncer@v1.1.0
         env:
           DEPLOY_KEY: ${{secrets.DEPLOY_KEY}}
@@ -143,7 +143,7 @@ jobs:
           options: ''
           ssh_options: '-p ${{secrets.DEPLOY_PORT}}'
           src: 'target/${{inputs.name}}.war'
-          dest: 'github@${{secrets.DEPLOY_IP}}:/opt/publisher/staging/${{inputs.name}}-${{env.VERSION}}.war'
+          dest: '${{ secrets.DEPLOY_USER }}@${{secrets.DEPLOY_IP}}:${{ secrets.PUBLISHER_PATH }}/${{inputs.name}}/versiones/${{inputs.name}}-${{env.VERSION}}.war'
 #          dest: 'github@${{secrets.DEPLOY_IP}}:/opt/publisher/staging/${{inputs.name}}/${{inputs.name}}-${{env.VERSION}}.war'
 
       #      TODO: Entender si es con esto o disparar algo de jenkins
