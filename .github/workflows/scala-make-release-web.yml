@@ -94,11 +94,16 @@ jobs:
       - name: Build war
         run: sbt package
 
+      - name: Get current version
+        run: |
+          versionString=$(awk '/ThisBuild \/ version := /{print $NF}' version.sbt)
+          echo "VERSION=`echo ${versionString:1:-1}`" >> $GITHUB_ENV
+
       - name: Upload artifact
         uses: actions/upload-artifact@v2
         with:
           name: ${{inputs.name}}
-          path: "./target/${{inputs.name}}.war"
+          path: "./target/${{inputs.name}}-${{env.VERSION}}.war"
 
       - name: PR to main
         uses: vsoch/pull-request-action@1.0.18
@@ -126,8 +131,10 @@ jobs:
           token: ${{ secrets.SYSADMIN_PAT }}
           jdk-version: ${{ inputs.jdk-version }}
 
-      - name: Extract latest version
-        run: echo "VERSION=`echo $(git describe --tags $(git rev-list --tags --max-count=1))`" >> $GITHUB_ENV
+      - name: Get current version
+        run: |
+          versionString=$(awk '/ThisBuild \/ version := /{print $NF}' version.sbt)
+          echo "VERSION=`echo ${versionString:1:-1}`" >> $GITHUB_ENV
 
       - name: Publish release notes
         uses: release-drafter/release-drafter@v5
@@ -145,7 +152,7 @@ jobs:
         uses: actions/download-artifact@v2
         with:
           name: ${{inputs.name}}
-          path: "./target/${{inputs.name}}.war"
+          path: "./target/${{inputs.name}}-${{env.VERSION}}.war"
 
       - name: Storage War
         uses: Pendect/action-rsyncer@v1.1.0
