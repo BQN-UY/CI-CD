@@ -91,6 +91,9 @@ jobs:
           tags: true
           force: true
 
+      - name: Build war
+        run: sbt package
+
       - name: Upload artifact
         uses: actions/upload-artifact@v2
         with:
