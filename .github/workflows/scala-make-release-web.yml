@@ -12,14 +12,6 @@ on:
         description: name
         required: true
         type: string
-      deploy-staging:
-        description: deploy-staging
-        required: true
-        type: string
-      deploy-production:
-        description: deploy-production
-        required: true
-        type: string
     secrets:
       SYSADMIN_PAT:
         required: true
@@ -108,7 +100,7 @@ jobs:
 
   deploy:
     runs-on: ubuntu-latest
-    if: always() && contains(join(needs.*.result, ','), 'success') && (inputs.deploy-staging == 'true' || inputs.deploy-production == 'true')
+    if: always() && contains(join(needs.*.result, ','), 'success')
     needs: [ default-release, hotfix-release ]
     timeout-minutes: 10
     env:
@@ -143,7 +135,6 @@ jobs:
           path: target
 
       - name: Storage staging war
-        if: inputs.deploy-staging == 'true'
         uses: Pendect/action-rsyncer@v1.1.0
         env:
           DEPLOY_KEY: ${{secrets.DEPLOY_KEY}}
@@ -158,29 +149,6 @@ jobs:
       #      TODO: Entender si es con esto o disparar algo de jenkins
       #      - name: Deploy staging dispatch
       #        if: inputs.deploy-staging == 'true'
-      #        uses: peter-evans/repository-dispatch@v1
-      #        with:
-      #          token: ${{ secrets.SYSADMIN_PAT }}
-      #          repository: BQN-UY/CI-CD
-      #          event-type: deployer-auto
-      #          client-payload: '{"repo": "spa", "version": "${{ env.VERSION }}", "environment": "TESTING", "installation": "DEFAULT"}'
-
-      - name: Storage production war
-        if: inputs.deploy-production == 'true'
-        uses: Pendect/action-rsyncer@v1.1.0
-        env:
-          DEPLOY_KEY: ${{secrets.DEPLOY_KEY}}
-        with:
-          flags: '-avz --delete'
-          options: ''
-          ssh_options: '-p ${{secrets.DEPLOY_PORT}}'
-          src: 'target/${{inputs.name}}.war'
-          dest: 'github@${{secrets.DEPLOY_IP}}:/opt/publisher/production/${{inputs.name}}-${{env.VERSION}}.war'
-#          dest: 'github@${{secrets.DEPLOY_IP}}:/opt/publisher/production/${{inputs.name}}/${{inputs.name}}-${{env.VERSION}}.war'
-
-      #      TODO: Entender si es con esto o disparar algo de jenkins
-      #      - name: Deploy production dispatch
-      #        if: inputs.deploy-production == 'true'
       #        uses: peter-evans/repository-dispatch@v1
       #        with:
       #          token: ${{ secrets.SYSADMIN_PAT }}
