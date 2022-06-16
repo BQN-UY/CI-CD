@@ -25,6 +25,8 @@ on:
         required: true
       DEPLOY_PORT:
         required: true
+      DEPLOY_USER:
+        required: true
       JENKINS_URL:
         required: true
       JENKINS_DEPLOY_JOB:
