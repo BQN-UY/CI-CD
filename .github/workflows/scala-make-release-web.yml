@@ -142,7 +142,7 @@ jobs:
         uses: actions/download-artifact@v2
         with:
           name: ${{inputs.name}}
-          path: target
+          path: "./target/${{inputs.name}}.war"
 
       - name: Storage War
         uses: Pendect/action-rsyncer@v1.1.0
