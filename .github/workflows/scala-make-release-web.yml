@@ -97,6 +97,9 @@ jobs:
       - name: Build war
         run: sbt package
 
+      - name: Display structure of downloaded files
+        run: ls -R
+
       - name: Get current version
         run: |
           versionString=$(awk '/ThisBuild \/ version := /{print $NF}' version.sbt)
@@ -106,8 +109,9 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: "${{inputs.name}}-${{env.VERSION}}"
-          path: "target/${{inputs.name}}-${{env.VERSION}}.war"
+          path: "target/${{inputs.name}}.war"
           retention-days: 1
+          if-no-files-found: error 
 
       - name: PR to main
         uses: vsoch/pull-request-action@1.0.18
