@@ -151,9 +151,9 @@ jobs:
           config-name: release-drafter.yml
           publish: true
           prerelease: false
-          name: "${{ env.PUBLISH_VERSION }}"
-          tag: "${{ env.PUBLISH_VERSION }}"
-          version: "${{ env.PUBLISH_VERSION }}"
+          name: "${{ env.VERSION }}"
+          tag: "${{ env.VERSION }}"
+          version: "${{ env.VERSION }}"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
