@@ -59,6 +59,11 @@ jobs:
           git config --global user.email github-actions@github.com
           sbt "release with-defaults"
 
+      - name: Get current version
+        run: |
+          versionString=$(awk '/ThisBuild \/ version := /{print $NF}' version.sbt)
+          echo "VERSION=`echo ${versionString:1:-1}`" >> $GITHUB_ENV
+
       - name: Upload artifact
         uses: actions/upload-artifact@v2
         with:
@@ -137,7 +142,8 @@ jobs:
       - name: Get current version
         run: |
           versionString=$(awk '/ThisBuild \/ version := /{print $NF}' version.sbt)
-          echo "VERSION=`echo ${versionString:1:-1} | cut -d"-" -f1`" >> $GITHUB_ENV
+          echo "VERSION=`echo ${versionString:1:-1}`" >> $GITHUB_ENV
+          echo "PUBLISH_VERSION=`echo ${versionString:1:-1} | cut -d"-" -f1`" >> $GITHUB_ENV
 
       - name: Publish release notes
         uses: release-drafter/release-drafter@v5
@@ -145,9 +151,9 @@ jobs:
           config-name: release-drafter.yml
           publish: true
           prerelease: false
-          name: "${{ env.VERSION }}"
-          tag: "${{ env.VERSION }}"
-          version: "${{ env.VERSION }}"
+          name: "${{ env.PUBLISH_VERSION }}"
+          tag: "${{ env.PUBLISH_VERSION }}"
+          version: "${{ env.PUBLISH_VERSION }}"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
