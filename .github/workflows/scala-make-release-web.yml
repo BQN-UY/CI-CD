@@ -157,6 +157,7 @@ jobs:
         uses: actions/download-artifact@v2
         with:
           name: "${{inputs.name}}-${{env.VERSION}}"
+          path: "target/"
 
       - name: Display structure of downloaded files
         run: ls -R
@@ -169,7 +170,7 @@ jobs:
           flags: '-avz --delete'
           options: ''
           ssh_options: '-p ${{secrets.DEPLOY_PORT}}'
-          src: 'target/${{inputs.name}}-${{env.VERSION}}/${{inputs.name}}.war'
+          src: 'target/${{inputs.name}}.war'
           dest: '${{ secrets.DEPLOY_USER }}@${{secrets.DEPLOY_IP}}:${{ secrets.PUBLISHER_PATH }}/${{inputs.name}}/versiones/${{inputs.name}}-${{env.VERSION}}.war'
 
       - name: Executing deloy script
