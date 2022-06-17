@@ -105,8 +105,8 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v2
         with:
-          name: "${{inputs.name}}-${{env.VERSION}}.war"
-          path: "./target"
+          name: "${{inputs.name}}-${{env.VERSION}}"
+          path: "./target/${{inputs.name}}-${{env.VERSION}}.war"
           retention-days: 1
 
       - name: PR to main
@@ -155,8 +155,8 @@ jobs:
       - name: Download artifact
         uses: actions/download-artifact@v2
         with:
-          name: "${{inputs.name}}-${{env.VERSION}}.war"
-          path: "./target"
+          name: "${{inputs.name}}-${{env.VERSION}}"
+          path: "./target/${{inputs.name}}-${{env.VERSION}}.war"
 
       - name: Storage War
         uses: Pendect/action-rsyncer@v1.1.0
