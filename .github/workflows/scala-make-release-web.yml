@@ -153,11 +153,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Download artifact
-        uses: actions/download-artifact@v2
-        with:
-          name: "${{inputs.name}}-${{env.VERSION}}"
-          path: "target/${{inputs.name}}-${{env.VERSION}}.war"
+      # - name: Download artifact
+      #   uses: actions/download-artifact@v2
+      #   with:
+      #     name: "${{inputs.name}}-${{env.VERSION}}"
+      #     path: "target/${{inputs.name}}-${{env.VERSION}}.war"
 
       - name: Display structure of downloaded files
         run: ls -R
