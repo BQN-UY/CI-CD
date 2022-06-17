@@ -97,9 +97,6 @@ jobs:
       - name: Build war
         run: sbt package
 
-      - name: Display structure of downloaded files
-        run: ls -R
-
       - name: Get current version
         run: |
           versionString=$(awk '/ThisBuild \/ version := /{print $NF}' version.sbt)
@@ -160,6 +157,10 @@ jobs:
         uses: actions/download-artifact@v2
         with:
           name: "${{inputs.name}}-${{env.VERSION}}"
+          name: "target/${{inputs.name}}-${{env.VERSION}}.war"
+
+      - name: Display structure of downloaded files
+        run: ls -R
 
       - name: Storage War
         uses: Pendect/action-rsyncer@v1.1.0
