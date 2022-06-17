@@ -62,9 +62,10 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v2
         with:
-          name: "${{inputs.name}}.war"
-          path: "./target"
+          name: "${{inputs.name}}-${{env.VERSION}}"
+          path: "target/${{inputs.name}}.war"
           retention-days: 1
+          if-no-files-found: error 
 
   hotfix-release:
     if: startsWith(github.ref, 'refs/heads/v')
@@ -93,9 +94,6 @@ jobs:
           branch: ${{ github.ref }}
           tags: true
           force: true
-
-      - name: Build war
-        run: sbt package
 
       - name: Get current version
         run: |
@@ -139,7 +137,7 @@ jobs:
       - name: Get current version
         run: |
           versionString=$(awk '/ThisBuild \/ version := /{print $NF}' version.sbt)
-          echo "VERSION=`echo ${versionString:1:-1}`" >> $GITHUB_ENV
+          echo "VERSION=`echo ${versionString:1:-1} | cut -d"-" -f1`" >> $GITHUB_ENV
 
       - name: Publish release notes
         uses: release-drafter/release-drafter@v5
