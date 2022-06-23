@@ -112,7 +112,7 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: "${{inputs.name}}"
-          path: "target/"
+          path: "target/${{inputs.name}}.war"
           retention-days: 1
           if-no-files-found: error 
 
