@@ -92,6 +92,9 @@ jobs:
           git config --global user.email github-actions@github.com
           sbt release-hotfix
 
+      - name: Build
+        run: sbt build
+
       - name: Push changes
         uses: ad-m/github-push-action@master
         with:
