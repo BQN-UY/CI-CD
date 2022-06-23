@@ -2,6 +2,7 @@ name: deploy-war
 
 on:
   workflow_call:
+    inputs:
       name:
         type: string
         description: name
