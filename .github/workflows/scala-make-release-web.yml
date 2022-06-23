@@ -93,7 +93,7 @@ jobs:
           sbt release-hotfix
 
       - name: Build
-        run: sbt build
+        run: sbt package
 
       - name: Push changes
         uses: ad-m/github-push-action@master
