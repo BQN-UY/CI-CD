@@ -1,0 +1,42 @@
+name: deliver-war
+
+on:
+  workflow_call:
+    inputs:
+      name:
+        type: string
+        description: name
+        required: true
+    secrets:
+      DEPLOY_USER:
+        required: true
+      DEPLOY_KEY:
+        required: true
+      DEPLOY_IP:
+        required: true
+      DEPLOY_PORT:
+        required: true
+      PUBLISHER_PATH:
+        required: true
+
+      - name: Download artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: "${{inputs.name}}"
+          path: "./"
+      
+      - name: Get current version
+        run: |
+          versionString=$(awk '/ThisBuild \/ version := /{print $NF}' version.sbt)
+          echo "VERSION=`echo ${versionString:1:-1}`" >> $GITHUB_ENV
+
+      - name: Storage War
+        uses: Pendect/action-rsyncer@v1.1.0
+        env:
+          DEPLOY_KEY: ${{secrets.DEPLOY_KEY}}
+        with:
+          flags: '-avz --delete'
+          options: ''
+          ssh_options: '-p ${{secrets.DEPLOY_PORT}}'
+          src: 'target/${{inputs.name}}.war'
+          dest: '${{ secrets.DEPLOY_USER }}@${{secrets.DEPLOY_IP}}:${{ secrets.PUBLISHER_PATH }}/${{inputs.name}}/versiones/${{inputs.name}}-${{env.VERSION}}.war'

@@ -1,0 +1,50 @@
+name: build-war
+
+on:
+  workflow_call:
+    inputs:
+      jdk-version:
+        type: string
+        description: 'jdk version'
+        default: '8'
+        required: false
+      name:
+        type: string
+        description: name
+        required: true
+    secrets:
+      SYSADMIN_PAT:
+        required: true
+      NEXUS_USER:
+        required: true
+      NEXUS_PASSWORD:
+        required: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      NEXUS_USER: ${{ secrets.NEXUS_USER }}
+      NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
+    steps:
+      - name: Checkout / Setup JDK / sbt-cache
+        uses: BQN-UY/action_checkout_jdk_sbt-cache@main
+        with:
+          token: ${{ secrets.SYSADMIN_PAT }}
+          jdk-version: ${{ inputs.jdk-version }}
+
+      - name: Build war
+        run: sbt package
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: "${{inputs.name}}"
+          path: |
+            target/${{inputs.name}}.war
+            version.svt
+          retention-days: 1
+          if-no-files-found: error 
+
+          

@@ -6,10 +6,6 @@ on:
         type: string
         description: name
         required: true
-      version:
-        type: string
-        description: version
-        required: true
     secrets:
       DEPLOY_USER:
         required: true
@@ -36,8 +32,13 @@ jobs:
       - name: Download artifact
         uses: actions/download-artifact@v2
         with:
-          name: "${{inputs.name}}-${{inputs.version}}"
-          path: "target/"
+          name: "${{inputs.name}}"
+          path: "./"
+
+      - name: Get current version
+        run: |
+          versionString=$(awk '/ThisBuild \/ version := /{print $NF}' version.sbt)
+          echo "VERSION=`echo ${versionString:1:-1}`" >> $GITHUB_ENV
 
       - name: Executing deloy script
         uses: appleboy/ssh-action@master
