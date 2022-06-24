@@ -145,8 +145,10 @@ jobs:
           token: ${{ secrets.SYSADMIN_PAT }}
           jdk-version: ${{ inputs.jdk-version }}
 
-      - name: Extract latest version
-        run: echo "VERSION=`echo $(git describe --tags $(git rev-list --tags --max-count=1))`" >> $GITHUB_ENV
+      - name: Get current version
+        run: |
+          versionString=$(awk '/ThisBuild \/ version := /{print $NF}' version.sbt)
+          echo "VERSION=`echo ${versionString:1:-1} | cut -d"-" -f1`" >> $GITHUB_ENV
 
       - name: Publish release notes
         uses: release-drafter/release-drafter@v5
@@ -154,9 +156,9 @@ jobs:
           config-name: release-drafter.yml
           publish: true
           prerelease: false
-          name: "${{ env.VERSION }}"
-          tag: "${{ env.VERSION }}"
-          version: "${{ env.VERSION }}"
+          name: "v${{ env.VERSION }}"
+          tag: "v${{ env.VERSION }}"
+          version: "v${{ env.VERSION }}"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
