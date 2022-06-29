@@ -148,7 +148,7 @@ jobs:
       - name: Get current version
         run: |
           versionString=$(awk '/ThisBuild \/ version := /{print $NF}' version.sbt)
-          echo "VERSION=`echo ${versionString:1:-1} | cut -d"-" -f1`" >> $GITHUB_ENV
+          echo "VERSION=`echo ${versionString:1:-1}`" >> $GITHUB_ENV
 
       - name: Publish release notes
         uses: release-drafter/release-drafter@v5
