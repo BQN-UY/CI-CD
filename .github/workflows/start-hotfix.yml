@@ -10,7 +10,7 @@ on:
         type: string
       git-hotfix-ref:
         description: Hotfix Name
-        required: false
+        required: true
         type: string
     secrets:
       SYSADMIN_PAT:
