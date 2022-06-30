@@ -72,6 +72,18 @@ jobs:
           retention-days: 1
           if-no-files-found: error 
 
+      - name: Publish release notes
+        uses: release-drafter/release-drafter@v5
+        with:
+          config-name: release-drafter-hotfix.yml
+          publish: true
+          prerelease: false
+          name: "v${{ env.VERSION }}"
+          tag: "v${{ env.VERSION }}"
+          version: "v${{ env.VERSION }}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   hotfix-release:
     if: startsWith(github.ref, 'refs/heads/v')
     runs-on: ubuntu-latest
@@ -118,6 +130,19 @@ jobs:
           path: "target/${{inputs.name}}.war"
           retention-days: 1
           if-no-files-found: error 
+      
+      - name: Publish hotfix notes
+        uses: release-drafter/release-drafter@v5
+        with:
+          config-name: release-drafter.yml
+          publish: true
+          prerelease: false
+          comitish: "v${{ env.VERSION }}"
+          name: "v${{ env.VERSION }}"
+          tag: "v${{ env.VERSION }}"
+          version: "v${{ env.VERSION }}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: PR to main
         uses: vsoch/pull-request-action@1.0.18
@@ -149,18 +174,6 @@ jobs:
         run: |
           versionString=$(awk '/ThisBuild \/ version := /{print $NF}' version.sbt)
           echo "VERSION=`echo ${versionString:1:-1} | cut -d"-" -f1`" >> $GITHUB_ENV
-
-      - name: Publish release notes
-        uses: release-drafter/release-drafter@v5
-        with:
-          config-name: release-drafter.yml
-          publish: true
-          prerelease: false
-          name: "v${{ env.VERSION }}"
-          tag: "v${{ env.VERSION }}"
-          version: "v${{ env.VERSION }}"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Download artifact
         uses: actions/download-artifact@v2
