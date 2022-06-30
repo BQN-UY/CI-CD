@@ -118,7 +118,7 @@ jobs:
       - name: Get current version
         run: |
           versionString=$(awk '/ThisBuild \/ version := /{print $NF}' version.sbt)
-          echo "VERSION=`echo ${versionString:1:-1}`" >> $GITHUB_ENV
+          echo "VERSION=`echo ${versionString:1:-1} | sed 's/-SNAPSHOT//g'`" >> $GITHUB_ENV
 
       - name: Upload artifact
         uses: actions/upload-artifact@v2

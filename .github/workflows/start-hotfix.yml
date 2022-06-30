@@ -45,7 +45,7 @@ jobs:
           git config --global user.name github-actions
           git config --global user.email github-actions@github.com
           version=${{ env.VERSION }}
-          [[ "$version" =~ (.*[^0-9])([0-9]+)$ ]] && newVersion="${BASH_REMATCH[1]}$((${BASH_REMATCH[2]} + 1))"
+          [[ "$version" =~ (.*[^0-9])([0-9]+)$ ]] && newVersion="${BASH_REMATCH[1]}$((${BASH_REMATCH[2]} + 1))-SNAPSHOT"
           git checkout -b $newVersion $version
           search=${version:1}
           replace=${newVersion:1}
