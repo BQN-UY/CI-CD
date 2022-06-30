@@ -53,7 +53,7 @@ jobs:
           git add -A
           git commit -m "new hotfix ($version => $newVersion)"
           git push --set-upstream origin refs/heads/$newVersion:refs/heads/$newVersion
-          hotfix=${{ inputs.git-hotfix-ref }}
+          hotfix=`echo ${{ inputs.git-hotfix-ref }} | sed 's/ /_/g'`
           if [[ -z "$hotfix" ]]; then
              echo "No es necesario crear hotfix branch"
           else
