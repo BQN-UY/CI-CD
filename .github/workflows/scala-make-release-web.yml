@@ -62,7 +62,7 @@ jobs:
       - name: Get current version
         run: |
           versionString=$(awk '/ThisBuild \/ version := /{print $NF}' version.sbt)
-          echo "VERSION=`echo ${versionString:1:-1} | sed 's/-SNAPSHOT//g'`" >> $GITHUB_ENV
+          echo "VERSION=`echo ${versionString:1:-1}`" >> $GITHUB_ENV
 
       - name: Upload artifact
         uses: actions/upload-artifact@v2
@@ -75,7 +75,7 @@ jobs:
       - name: Publish release notes
         uses: release-drafter/release-drafter@v5
         with:
-          config-name: release-drafter-hotfix.yml
+          config-name: release-drafter.yml
           publish: true
           prerelease: false
           name: "v${{ env.VERSION }}"
@@ -120,9 +120,6 @@ jobs:
           versionString=$(awk '/ThisBuild \/ version := /{print $NF}' version.sbt)
           echo "VERSION=`echo ${versionString:1:-1}`" >> $GITHUB_ENV
 
-      - name: Display structure of downloaded files
-        run: ls -R
-
       - name: Upload artifact
         uses: actions/upload-artifact@v2
         with:
@@ -134,7 +131,7 @@ jobs:
       - name: Publish hotfix notes
         uses: release-drafter/release-drafter@v5
         with:
-          config-name: release-drafter.yml
+          config-name: release-drafter-hotfix.yml
           publish: true
           prerelease: false
           comitish: "v${{ env.VERSION }}"
