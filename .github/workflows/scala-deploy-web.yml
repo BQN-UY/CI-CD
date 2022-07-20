@@ -4,14 +4,10 @@ on:
   workflow_call:
     inputs:
       jdk-version:
-        required: false
+        type: string
         description: 'jdk version'
-        type: string
         default: '8'
-      environment:
-        type: string
-        description: environment
-        required: true
+        required: false
       name:
         type: string
         description: name
@@ -23,17 +19,27 @@ on:
         required: true
       NEXUS_PASSWORD:
         required: true
+      DEPLOY_USER:
+        required: true
       DEPLOY_KEY:
         required: true
       DEPLOY_IP:
         required: true
       DEPLOY_PORT:
         required: true
-
+      JENKINS_URL:
+        required: true
+      JENKINS_DEPLOY_JOB:
+        required: true
+      JENKINS_USER:
+        required: true
+      JENKINS_TOKEN:
+        required: true
+      PUBLISHER_PATH:
+        required: true
 
 jobs:
-  testing:
-    if: inputs.environment == 'testing'
+  deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
@@ -54,7 +60,7 @@ jobs:
           versionString=$(awk '/ThisBuild \/ version := /{print $NF}' version.sbt)
           echo "VERSION=`echo ${versionString:1:-1}`" >> $GITHUB_ENV
 
-      - name: Storage Testing War
+      - name: Storage War
         uses: Pendect/action-rsyncer@v1.1.0
         env:
           DEPLOY_KEY: ${{secrets.DEPLOY_KEY}}
@@ -63,17 +69,17 @@ jobs:
           options: ''
           ssh_options: '-p ${{secrets.DEPLOY_PORT}}'
           src: 'target/${{inputs.name}}.war'
-          dest: 'github@${{secrets.DEPLOY_IP}}:/opt/publisher/testing/${{inputs.name}}-${{env.VERSION}}.war'
-#          dest: 'github@${{secrets.DEPLOY_IP}}:/opt/publisher/testing/${{inputs.name}}/${{inputs.name}}-${{env.VERSION}}.war'
-
-#      TODO: Entender si es con esto o disparar algo de jenkins
-#      - name: Deploy Testing Dispatch
-#        uses: peter-evans/repository-dispatch@v1
-#        with:
-#          token: ${{ secrets.SYSADMIN_PAT }}
-#          repository: BQN-UY/CI-CD
-#          event-type: deployer-auto
-#          client-payload: '{"repo": "spa", "version": "${{ env.VERSION }}", "environment": "TESTING", "installation": "DEFAULT"}'
-
-
-
+          dest: '${{ secrets.DEPLOY_USER }}@${{secrets.DEPLOY_IP}}:${{ secrets.PUBLISHER_PATH }}/${{inputs.name}}/versiones/${{inputs.name}}-${{env.VERSION}}.war'
+      
+      - name: Executing deloy script
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.DEPLOY_IP }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_KEY }}
+          port: ${{ secrets.DEPLOY_PORT }}
+          script: |
+            # Curl para el crumbs
+            crumb=$(curl -u "${{ secrets.JENKINS_USER }}:${{ secrets.JENKINS_TOKEN }}" -s '${{ secrets.JENKINS_URL }}/crumbIssuer/api/json')
+            # Curl para ejecutar
+            curl -u "${{ secrets.JENKINS_USER }}:${{ secrets.JENKINS_TOKEN }}" -H "$crumb" -X POST '${{ secrets.JENKINS_URL }}/${{ secrets.JENKINS_DEPLOY_JOB }}/buildWithParameters?SISTEMA=${{inputs.name}}&VERSION=${{env.VERSION}}'
