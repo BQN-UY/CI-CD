@@ -56,7 +56,7 @@ jobs:
         run: sbt package
 
       - name: Show tree
-        run: ls -la
+        run: ls -la ./target
 
       - name: Get current version
         run: |
