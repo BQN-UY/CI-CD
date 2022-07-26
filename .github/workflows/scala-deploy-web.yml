@@ -55,9 +55,6 @@ jobs:
       - name: Build war
         run: sbt package
 
-      - name: Show tree
-        run: tree ./target
-
       - name: Get current version
         run: |
           versionString=$(awk '/ThisBuild \/ version := /{print $NF}' version.sbt)
