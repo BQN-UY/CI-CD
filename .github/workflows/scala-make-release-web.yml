@@ -73,7 +73,7 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: "${{inputs.name}}"
-          path: "${{build_path}}/${{inputs.name}}.war"
+          path: "${{inputs.build_path}}/${{inputs.name}}.war"
           retention-days: 1
           if-no-files-found: error 
 
@@ -129,7 +129,7 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: "${{inputs.name}}"
-          path: "${{build_path}}/${{inputs.name}}.war"
+          path: "${{inputs.build_path}}/${{inputs.name}}.war"
           retention-days: 1
           if-no-files-found: error 
       
