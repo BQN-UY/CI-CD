@@ -8,6 +8,11 @@ on:
         description: 'jdk version'
         default: '8'
         required: false
+      build_path:
+        type: string
+        description: 'Ubicación donde se encontrará el sistema compilado (without leading slash)'
+        default: 'target'
+        required: false
       name:
         type: string
         description: name
@@ -68,7 +73,7 @@ jobs:
           flags: '-avz --delete'
           options: ''
           ssh_options: '-p ${{secrets.DEPLOY_PORT}}'
-          src: 'target/${{inputs.name}}.war'
+          src: '${{build_path}}/${{inputs.name}}.war'
           dest: '${{ secrets.DEPLOY_USER }}@${{secrets.DEPLOY_IP}}:${{ secrets.PUBLISHER_PATH }}/${{inputs.name}}/versiones/${{inputs.name}}-${{env.VERSION}}.war'
       
       - name: Executing deloy script
