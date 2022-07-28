@@ -8,6 +8,11 @@ on:
         description: 'jdk version'
         default: '8'
         required: false
+      build_path:
+        type: string
+        description: 'Ubicación donde se encontrará el sistema compilado (without leading slash)'
+        default: 'target'
+        required: false
       name:
         type: string
         description: name
