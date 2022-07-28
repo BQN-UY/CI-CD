@@ -8,6 +8,11 @@ on:
         description: 'jdk version'
         type: string
         default: '8'
+      build_path:
+        type: string
+        description: 'Ubicación donde se encontrará el sistema compilado (without leading slash)'
+        default: 'target'
+        required: false
       name:
         description: name
         required: true
@@ -68,7 +73,7 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: "${{inputs.name}}"
-          path: "target/${{inputs.name}}.war"
+          path: "${{build_path}}/${{inputs.name}}.war"
           retention-days: 1
           if-no-files-found: error 
 
@@ -124,7 +129,7 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: "${{inputs.name}}"
-          path: "target/${{inputs.name}}.war"
+          path: "${{build_path}}/${{inputs.name}}.war"
           retention-days: 1
           if-no-files-found: error 
       

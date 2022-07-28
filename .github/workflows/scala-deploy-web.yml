@@ -73,7 +73,7 @@ jobs:
           flags: '-avz --delete'
           options: ''
           ssh_options: '-p ${{secrets.DEPLOY_PORT}}'
-          src: 'target/${{inputs.name}}.war'
+          src: '${{build_path}}/${{inputs.name}}.war'
           dest: '${{ secrets.DEPLOY_USER }}@${{secrets.DEPLOY_IP}}:${{ secrets.PUBLISHER_PATH }}/${{inputs.name}}/versiones/${{inputs.name}}-${{env.VERSION}}.war'
       
       - name: Executing deloy script
