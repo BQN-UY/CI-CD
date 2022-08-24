@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - use: Bhacaz/checkout-files
+      - uses: Bhacaz/checkout-files
         with:
           files: version.sbt
           token: ${{ secrets.SYSADMIN_PAT }}
