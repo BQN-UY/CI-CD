@@ -11,19 +11,17 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Checkout version.sbt
-        uses: Bhacaz/checkout-files
+      - uses: Bhacaz/checkout-files@v2
         with:
           files: version.sbt
+          branch: main
           token: ${{ secrets.SYSADMIN_PAT }}
 
-      - name: Get current version
-        run: |
+      - run: |
           versionString=$(awk '/ThisBuild \/ version := /{print $NF}' version.sbt)
           echo "VERSION=`echo ${versionString:1:-1} | sed 's/-SNAPSHOT//g'`" >> $GITHUB_ENV
 
-      - name: Release Drafter
-        uses: release-drafter/release-drafter@v5
+      - uses: release-drafter/release-drafter@v5
         with:
           config-name: release-drafter.yml
           commitish: main
