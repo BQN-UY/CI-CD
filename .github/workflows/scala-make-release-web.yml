@@ -138,6 +138,7 @@ jobs:
           config-name: release-drafter.yml
           publish: true
           prerelease: false
+          commitish: 'main'
           name: "v${{ env.VERSION }}"
           tag: "v${{ env.VERSION }}"
         env:
