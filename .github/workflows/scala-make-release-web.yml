@@ -85,6 +85,7 @@ jobs:
           prerelease: false
           name: "v${{ env.VERSION }}"
           tag: "v${{ env.VERSION }}"
+          version: "v${{ env.VERSION }}"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -138,9 +139,10 @@ jobs:
           config-name: release-drafter.yml
           publish: true
           prerelease: false
-          commitish: 'main'
+          commitish: "v${{ env.VERSION }}"
           name: "v${{ env.VERSION }}"
           tag: "v${{ env.VERSION }}"
+          version: "v${{ env.VERSION }}"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
