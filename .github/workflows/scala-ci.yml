@@ -29,13 +29,13 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.SYSADMIN_PAT }}
 
   u-tests:
-    if: "contains(github.event.head_commit.message, 'ci:') || contains(github.event.head_commit.message, '(ci)')"
+    if: "!(contains(github.event.head_commit.message, 'ci:') || contains(github.event.head_commit.message, '(ci)'))"
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
       NEXUS_USER: ${{ secrets.NEXUS_USER }}
       NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
-    steps:
+    steps:s
       - name: Checkout / Setup JDK / sbt-cache
         uses: BQN-UY/action_checkout_jdk_sbt-cache@main
         with:
