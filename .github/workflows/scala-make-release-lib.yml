@@ -32,7 +32,7 @@ jobs:
 
       - name: Get scala changed files
         id: changed-scala-files
-        uses: tj-actions/changed-files@v15
+        uses: tj-actions/changed-files@v32
         with:
           files: |
             *.sbt
