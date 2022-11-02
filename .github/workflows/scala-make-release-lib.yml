@@ -37,6 +37,7 @@ jobs:
           dir_names: "true"
           files: |
             *.sbt
+            **/*.sbt
             **/*.scala     
 
   make-release:
