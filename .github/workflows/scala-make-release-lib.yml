@@ -34,6 +34,7 @@ jobs:
         id: changed-scala-files
         uses: tj-actions/changed-files@v34
         with:
+          dir_names: "false"
           files: |
             *.sbt
             **/*.scala     
