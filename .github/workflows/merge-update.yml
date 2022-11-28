@@ -12,7 +12,7 @@ jobs:
     timeout-minutes: 3
     steps:
       - name: Label the PR action
-        uses: TimonVS/pr-labeler-action@v3
+        uses: TimonVS/pr-labeler-action@v4
         with:
           configuration-path: .github/labeler.yml
         env:
