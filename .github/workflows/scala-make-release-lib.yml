@@ -8,9 +8,6 @@ on:
         description: 'jdk version'
         type: string
         default: '8'
-      force-release:
-        required: false
-        type: string
     secrets:
       SYSADMIN_PAT:
         required: true
@@ -19,30 +16,9 @@ on:
       NEXUS_PASSWORD:
         required: true
 
-jobs:
-  check-changes:
-    runs-on: ubuntu-latest
-    name: changed-files
-    outputs:
-      changed-scala-files: ${{ steps.changed-scala-files.outputs.any_changed }}
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          fetch-depth: 2
-
-      - name: Get scala changed files
-        id: changed-scala-files
-        uses: tj-actions/changed-files@v34
-        with:
-          dir_names: "true"
-          files: |
-            *.sbt
-            **/*.sbt
-            **/*.scala     
-
+jobs:  
   make-release:
-    needs: check-changes
-    if: (needs.check-changes.outputs.changed-scala-files == 'true' || inputs.force-release == 'true') && github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
@@ -76,8 +52,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   make-release-hotfix:
-    needs: check-changes
-    if: (needs.check-changes.outputs.changed-scala-files == 'true' || inputs.force-release == 'true') && startsWith(github.ref, 'refs/heads/v')
+    if: startsWith(github.ref, 'refs/heads/v')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
