@@ -32,7 +32,7 @@ jobs:
 
       - name: Get scala changed files
         id: changed-scala-files
-        uses: tj-actions/changed-files@v34
+        uses: tj-actions/changed-files@v35
         with:
           dir_names: "true"
           files: |
