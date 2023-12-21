@@ -147,7 +147,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: PR to main
-        uses: vsoch/pull-request-action@1.0.18
+        uses: vsoch/pull-request-action@1.1.0
         env:
           GITHUB_TOKEN: ${{ secrets.SYSADMIN_PAT }}
           ULL_REQUEST_FROM_BRANCH: ${{ github.ref }}
