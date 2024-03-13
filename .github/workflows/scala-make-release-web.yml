@@ -150,7 +150,8 @@ jobs:
         uses: vsoch/pull-request-action@1.1.0
         env:
           GITHUB_TOKEN: ${{ secrets.SYSADMIN_PAT }}
-          ULL_REQUEST_FROM_BRANCH: ${{ github.ref }}
+          PULL_REQUEST_FROM_BRANCH: ${{ github.ref }}
+          BRANCH_PREFIX: "update/"
           PULL_REQUEST_BRANCH: "main"
           PULL_REQUEST_TITLE: "[hotfix] Update main from ${{ env.VERSION }}"
           PULL_REQUEST_BODY: "**ALERTA**: Siempre que se resuelva conflictos se debe aceptar la version **#.#.#-SNAPSHOT** de main"
