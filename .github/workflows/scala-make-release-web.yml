@@ -70,7 +70,7 @@ jobs:
           sbt "release with-defaults"
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: "${{inputs.name}}"
           path: "${{inputs.build_path}}/${{inputs.name}}.war"
@@ -126,7 +126,7 @@ jobs:
           echo "VERSION=`echo ${versionString:1:-1} | sed 's/-SNAPSHOT//g'`" >> $GITHUB_ENV
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: "${{inputs.name}}"
           path: "${{inputs.build_path}}/${{inputs.name}}.war"
