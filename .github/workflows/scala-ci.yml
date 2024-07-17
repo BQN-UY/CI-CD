@@ -33,8 +33,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
+      TZ: America/Montevideo
       NEXUS_USER: ${{ secrets.NEXUS_USER }}
       NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
+
     steps:
       - name: Checkout / Setup JDK / sbt-cache
         uses: BQN-UY/action_checkout_jdk_sbt-cache@main
