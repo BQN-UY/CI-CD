@@ -80,7 +80,7 @@ jobs:
           if-no-files-found: error 
 
       - name: Publish release notes
-        uses: release-drafter/release-drafter@v5
+        uses: release-drafter/release-drafter@v6
         with:
           config-name: release-drafter.yml
           publish: true
@@ -138,7 +138,7 @@ jobs:
           if-no-files-found: error 
       
       - name: Publish hotfix notes
-        uses: release-drafter/release-drafter@v5
+        uses: release-drafter/release-drafter@v6
         with:
           config-name: release-drafter.yml
           publish: true
