@@ -65,7 +65,7 @@ jobs:
           jdk-version: ${{ inputs.jdk-version }}
 
       - name: Build Jar
-        run: sbt assambly
+        run: sbt assembly
 
       - name: Get current version
         run: |
@@ -75,7 +75,7 @@ jobs:
       - name: Storage Jar
         uses: Pendect/action-rsyncer@v2.0.0
         env:
-          DEPLOY_KEY: ${{secrets.DEPLOY_KEY}}
+          DEPLOY_KEY: ${{secrets.DEPLOY_KEY}}:
         with:
           flags: '-avz --delete'
           options: ''
