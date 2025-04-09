@@ -80,8 +80,8 @@ jobs:
           flags: '-avz --delete'
           options: ''
           ssh_options: '-p ${{secrets.DEPLOY_PORT}}'
-          src: '${{inputs.build_path}}/${{inputs.name}}.war'
-          dest: '${{ secrets.DEPLOY_USER }}@${{secrets.DEPLOY_IP}}:${{ secrets.PUBLISHER_PATH }}/${{inputs.name}}/versiones/${{inputs.name}}-${{env.VERSION}}.war'
+          src: '${{inputs.build_path}}/${{inputs.name}}.jar'
+          dest: '${{ secrets.DEPLOY_USER }}@${{secrets.DEPLOY_IP}}:${{ secrets.PUBLISHER_PATH }}/${{inputs.name}}/versiones/${{inputs.name}}-${{env.VERSION}}.jar'
       
       - name: Executing deloy script
         uses: appleboy/ssh-action@master
