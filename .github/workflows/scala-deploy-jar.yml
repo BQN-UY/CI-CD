@@ -80,7 +80,7 @@ jobs:
           flags: '-avz --delete'
           options: ''
           ssh_options: '-p ${{secrets.DEPLOY_PORT}}'
-          src: '${{inputs.build_path}}/${{inputs.name}}.jar'
+          src: '${{inputs.build_path}}/${{inputs.name}}-${{env.VERSION}}.jar.jar'
           dest: '${{ secrets.DEPLOY_USER }}@${{secrets.DEPLOY_IP}}:${{ secrets.PUBLISHER_PATH }}/${{inputs.name}}/versiones/${{inputs.name}}-${{env.VERSION}}.jar'
       
       - name: Executing deloy script
