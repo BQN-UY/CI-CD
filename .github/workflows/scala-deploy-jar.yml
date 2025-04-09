@@ -64,7 +64,7 @@ jobs:
           token: ${{ secrets.SYSADMIN_PAT }}
           jdk-version: ${{ inputs.jdk-version }}
 
-      - name: Build war
+      - name: Build Jar
         run: sbt assambly
 
       - name: Get current version
@@ -72,7 +72,7 @@ jobs:
           versionString=$(awk '/ThisBuild \/ version := /{print $NF}' version.sbt)
           echo "VERSION=`echo ${versionString:1:-1}`" >> $GITHUB_ENV
 
-      - name: Storage War
+      - name: Storage Jar
         uses: Pendect/action-rsyncer@v2.0.0
         env:
           DEPLOY_KEY: ${{secrets.DEPLOY_KEY}}
