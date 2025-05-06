@@ -18,9 +18,9 @@ on:
         required: true
         type: string
       artifact_extension:
-        description: 'Extensión del artifacto (ej: .war (default), .jar)'
+        description: 'Extensión del artifacto (ej: .Jar (default), .jar)'
         type: string
-        default: '.war'
+        default: '.Jar'
         required: true
     secrets:
       SYSADMIN_PAT:
@@ -70,11 +70,11 @@ jobs:
           versionString=$(awk '/ThisBuild \/ version := /{print $NF}' version.sbt)
           echo "VERSION=`echo ${versionString:1:-1} | sed 's/-SNAPSHOT//g'`" >> $GITHUB_ENV
       
-      - name: Release
-        run: |
-          git config --global user.name github-actions
-          git config --global user.email github-actions@github.com
-          sbt "release with-defaults"
+      # - name: Release
+      #   run: |
+      #     git config --global user.name github-actions
+      #     git config --global user.email github-actions@github.com
+      #     sbt "release with-defaults"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -112,11 +112,11 @@ jobs:
           token: ${{ secrets.SYSADMIN_PAT }}
           jdk-version: ${{ inputs.jdk-version }}
 
-      - name: Release Hotfix
-        run: |
-          git config --global user.name github-actions
-          git config --global user.email github-actions@github.com
-          sbt release-hotfix
+      # - name: Release Hotfix
+      #   run: |
+      #     git config --global user.name github-actions
+      #     git config --global user.email github-actions@github.com
+      #     sbt release-hotfix
 
       - name: Build
         run: sbt assembly
@@ -195,7 +195,7 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
-      - name: Storage War
+      - name: Storage Jar
         uses: ./.github/actions/store-artifact
         with:
           publisher_path: ${{ secrets.PUBLISHER_PATH }}
