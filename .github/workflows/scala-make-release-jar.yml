@@ -65,27 +65,45 @@ jobs:
           token: ${{ secrets.SYSADMIN_PAT }}
           jdk-version: ${{ inputs.jdk-version }}
 
-      - name: Get current version
+      - name: Get current version and calculate release version
         run: |
-          versionString=$(awk '/ThisBuild \/ version := /{print $NF}' version.sbt)
-          echo "VERSION=`echo ${versionString:1:-1} | sed 's/-SNAPSHOT//g'`" >> $GITHUB_ENV
-      
-      # - name: Release
-      #   run: |
-      #     git config --global user.name github-actions
-      #     git config --global user.email github-actions@github.com
-      #     sbt "release with-defaults"
+          # Obtener la versión con -SNAPSHOT desde version.sbt
+          # Busca la línea 'ThisBuild / version := "..."' o 'version := "..."'
+          # Extrae la cadena entre comillas
+          currentVersion=$(awk '/(ThisBuild \/ )?version := / {print $NF}' version.sbt | sed 's/"//g')
+          echo "CURRENT_VERSION=$currentVersion" >> $GITHUB_ENV
 
-      - name: Build
+          # Calcular la versión de release (sin -SNAPSHOT)
+          releaseVersion=$(echo "$currentVersion" | sed 's/-SNAPSHOT//g')
+          echo "RELEASE_VERSION=$releaseVersion" >> $GITHUB_ENV
+
+          echo "Current version: $currentVersion"
+          echo "Release version: $releaseVersion"
+
+      - name: Build (sbt assembly)
         run: sbt assembly
+        # Este paso generará el JAR con el nombre que incluye -SNAPSHOT
+
+      - name: Rename artifact
+        run: |
+          # Directorio donde sbt assembly guarda el JAR (target/scala-2.13 por defecto)
+          # Ajusta la ruta si tu assembly lo guarda en otro lugar
+          # Buscamos el archivo generado por assembly que contiene la CURRENT_VERSION
+          jarFile="${{ inputs.build_path }}/scala-2.13/${{ inputs.name }}-${{ env.CURRENT_VERSION }}${{ inputs.artifact_extension }}"
+          newJarFile="${{ inputs.build_path }}/${{ inputs.name }}-${{ env.RELEASE_VERSION }}${{ inputs.artifact_extension }}"
+
+          echo "Renaming $jarFile to $newJarFile"
+          mv "$jarFile" "$newJarFile"
+          ls ${{ inputs.build_path }}/ # Listar para verificar el renombre
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: "${{inputs.name}}-${{env.VERSION}}${{inputs.artifact_extension}}"
-          path: "${{inputs.build_path}}/${{inputs.name}}-${{env.VERSION}}${{inputs.artifact_extension}}"
+          name: "${{inputs.name}}-${{env.RELEASE_VERSION}}${{inputs.artifact_extension}}"
+          # Usamos la ruta del archivo renombrado
+          path: "${{inputs.build_path}}/${{inputs.name}}-${{env.RELEASE_VERSION}}${{inputs.artifact_extension}}"
           retention-days: 1
-          if-no-files-found: error 
+          if-no-files-found: error
 
       - name: Publish release notes
         uses: release-drafter/release-drafter@v6
@@ -93,9 +111,9 @@ jobs:
           config-name: release-drafter.yml
           publish: true
           prerelease: false
-          name: "v${{ env.VERSION }}"
-          tag: "v${{ env.VERSION }}"
-          version: "v${{ env.VERSION }}"
+          name: "v${{ env.RELEASE_VERSION }}"
+          tag: "v${{ env.RELEASE_VERSION }}"
+          version: "v${{ env.RELEASE_VERSION }}"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -115,46 +133,62 @@ jobs:
           token: ${{ secrets.SYSADMIN_PAT }}
           jdk-version: ${{ inputs.jdk-version }}
 
-      # - name: Release Hotfix
-      #   run: |
-      #     git config --global user.name github-actions
-      #     git config --global user.email github-actions@github.com
-      #     sbt release-hotfix
+      - name: Get current version and calculate release version
+        run: |
+          # Obtener la versión con -SNAPSHOT desde version.sbt
+          currentVersion=$(awk '/(ThisBuild \/ )?version := / {print $NF}' version.sbt | sed 's/"//g')
+          echo "CURRENT_VERSION=$currentVersion" >> $GITHUB_ENV
 
-      - name: Build
+          # Calcular la versión de release (sin -SNAPSHOT)
+          releaseVersion=$(echo "$currentVersion" | sed 's/-SNAPSHOT//g')
+          echo "RELEASE_VERSION=$releaseVersion" >> $GITHUB_ENV
+
+          echo "Current version: $currentVersion"
+          echo "Release version: $releaseVersion"
+
+      - name: Build (sbt assembly)
         run: sbt assembly
+        # Este paso generará el JAR con el nombre que incluye -SNAPSHOT
+
+      - name: Rename artifact
+        run: |
+          # Directorio donde sbt assembly guarda el JAR (target/scala-2.13 por defecto)
+          # Ajusta la ruta si tu assembly lo guarda en otro lugar
+          # Buscamos el archivo generado por assembly que contiene la CURRENT_VERSION
+          jarFile="${{ inputs.build_path }}/scala-2.13/${{ inputs.name }}-${{ env.CURRENT_VERSION }}${{ inputs.artifact_extension }}"
+          newJarFile="${{ inputs.build_path }}/${{ inputs.name }}-${{ env.RELEASE_VERSION }}${{ inputs.artifact_extension }}"
+
+          echo "Renaming $jarFile to $newJarFile"
+          mv "$jarFile" "$newJarFile"
+          ls ${{ inputs.build_path }}/ # Listar para verificar el renombre
 
       - name: Push changes
         uses: ad-m/github-push-action@master
         with:
           github_token: ${{ secrets.SYSADMIN_PAT }}
           branch: ${{ github.ref }}
-          tags: true
-          force: true
-
-      - name: Get current version
-        run: |
-          versionString=$(awk '/ThisBuild \/ version := /{print $NF}' version.sbt)
-          echo "VERSION=`echo ${versionString:1:-1} | sed 's/-SNAPSHOT//g'`" >> $GITHUB_ENV
+          tags: true # Empujar tags creados por release-drafter
+          # force: true # Considera si realmente necesitas force push
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: "${{inputs.name}}-${{env.VERSION}}${{inputs.artifact_extension}}"
-          path: "${{inputs.build_path}}/${{inputs.name}}-${{env.VERSION}}${{inputs.artifact_extension}}"
+          name: "${{inputs.name}}-${{env.RELEASE_VERSION}}${{inputs.artifact_extension}}"
+          # Usamos la ruta del archivo renombrado
+          path: "${{inputs.build_path}}/${{inputs.name}}-${{env.RELEASE_VERSION}}${{inputs.artifact_extension}}"
           retention-days: 1
-          if-no-files-found: error 
-      
+          if-no-files-found: error
+
       - name: Publish hotfix notes
         uses: release-drafter/release-drafter@v6
         with:
           config-name: release-drafter.yml
           publish: true
           prerelease: false
-          commitish: main
-          name: "v${{ env.VERSION }}"
-          tag: "v${{ env.VERSION }}"
-          version: "v${{ env.VERSION }}"
+          commitish: main # O la rama base de tu hotfix si no es main
+          name: "v${{ env.RELEASE_VERSION }}"
+          tag: "v${{ env.RELEASE_VERSION }}"
+          version: "v${{ env.RELEASE_VERSION }}"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -162,11 +196,11 @@ jobs:
         uses: vsoch/pull-request-action@1.1.1
         env:
           GITHUB_TOKEN: ${{ secrets.SYSADMIN_PAT }}
-          # PULL_REQUEST_FROM_BRANCH: ${{ github.ref }}
+          # PULL_REQUEST_FROM_BRANCH: ${{ github.ref }} # Ya usa la rama actual por defecto
           PULL_REQUEST_BRANCH: "main"
-          PULL_REQUEST_TITLE: "[hotfix] Update main from ${{ env.VERSION }}"
+          PULL_REQUEST_TITLE: "[hotfix] Update main from ${{ env.RELEASE_VERSION }}"
           PULL_REQUEST_BODY: "**ALERTA**: Siempre que se resuelva conflictos se debe aceptar la version **#.#.#-SNAPSHOT** de main"
-          ACTIONS_ALLOW_UNSECURE_COMMANDS: 'true'
+          # ACTIONS_ALLOW_UNSECURE_COMMANDS: 'true' # Esta opción está obsoleta y debe evitarse
 
   deploy:
     runs-on: ubuntu-latest
@@ -185,14 +219,21 @@ jobs:
           token: ${{ secrets.SYSADMIN_PAT }}
           jdk-version: ${{ inputs.jdk-version }}
 
-      - name: Get current version
+      - name: Get release version for deploy
         run: |
-          versionString=$(awk '/ThisBuild \/ version := /{print $NF}' version.sbt)
-          echo "VERSION=`echo ${versionString:1:-1} | cut -d"-" -f1`" >> $GITHUB_ENV
+          # Obtener la versión con -SNAPSHOT desde version.sbt
+          currentVersion=$(awk '/(ThisBuild \/ )?version := / {print $NF}' version.sbt | sed 's/"//g')
+          # Calcular la versión de release (sin -SNAPSHOT)
+          releaseVersion=$(echo "$currentVersion" | sed 's/-SNAPSHOT//g')
+          echo "VERSION=$releaseVersion" >> $GITHUB_ENV # Usamos VERSION para compatibilidad con pasos posteriores
+
+          echo "Deploy version: $releaseVersion"
+
 
       - name: Download artifact
         uses: actions/download-artifact@v4
         with:
+          # Descargamos usando la versión de release (sin -SNAPSHOT)
           name: "${{inputs.name}}-${{env.VERSION}}${{inputs.artifact_extension}}"
           path: "${{inputs.build_path}}/"
           retention-days: 1
@@ -206,6 +247,7 @@ jobs:
           flags: '-avz --delete'
           options: ''
           ssh_options: '-p ${{secrets.DEPLOY_PORT}}'
+          # Usamos la ruta del archivo renombrado/descargado
           src: '${{inputs.build_path}}/${{inputs.name}}-${{env.VERSION}}${{ inputs.artifact_extension }}'
           dest: '${{ secrets.DEPLOY_USER }}@${{secrets.DEPLOY_IP}}:${{ secrets.PUBLISHER_PATH }}/${{inputs.name}}/versiones/${{inputs.name}}-${{env.VERSION}}.jar'
 
@@ -221,3 +263,4 @@ jobs:
             crumb=$(curl -u "${{ secrets.JENKINS_USER }}:${{ secrets.JENKINS_TOKEN }}" -s '${{ secrets.JENKINS_URL }}/crumbIssuer/api/json')
             # Curl para ejecutar
             curl -u "${{ secrets.JENKINS_USER }}:${{ secrets.JENKINS_TOKEN }}" -H "$crumb" -X POST '${{ secrets.JENKINS_URL }}/${{ secrets.JENKINS_DEPLOY_JOB }}/buildWithParameters?SISTEMA=${{inputs.name}}&VERSION=${{env.VERSION}}'
+
