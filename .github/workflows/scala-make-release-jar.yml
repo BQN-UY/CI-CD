@@ -64,17 +64,25 @@ jobs:
         with:
           token: ${{ secrets.SYSADMIN_PAT }}
           jdk-version: ${{ inputs.jdk-version }}
-
-      - name: Get current version
-        run: |
-          versionString=$(awk '/ThisBuild \/ version := /{print $NF}' version.sbt)
-          echo "VERSION=`echo ${versionString:1:-1} | sed 's/-SNAPSHOT//g'`" >> $GITHUB_ENV
       
       - name: Release
         run: |
           git config --global user.name github-actions
           git config --global user.email github-actions@github.com
-          sbt "release"
+          sbt "release with-defaults"
+
+      - name: Push changes
+        uses: ad-m/github-push-action@master
+        with:
+          github_token: ${{ secrets.SYSADMIN_PAT }}
+          branch: ${{ github.ref }}
+          tags: true
+          force: true
+
+      - name: Get current version
+        run: |
+          versionString=$(awk '/ThisBuild \/ version := /{print $NF}' version.sbt)
+          echo "VERSION=`echo ${versionString:1:-1} | sed 's/-SNAPSHOT//g'`" >> $GITHUB_ENV
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
