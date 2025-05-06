@@ -14,6 +14,15 @@ inputs:
   version:
     description: 'Versión del artifacto'
     required: true
+secrets:
+  DEPLOY_KEY:
+    required: true
+  DEPLOY_IP:
+    required: true
+  DEPLOY_PORT:
+    required: true
+  DEPLOY_USER:
+    required: true
 runs:
   using: "composite"
   steps:
