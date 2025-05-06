@@ -18,9 +18,9 @@ on:
         required: true
         type: string
       artifact_extension:
-        description: 'Extensión del artifacto (ej: .Jar (default), .jar)'
+        description: 'Extensión del artifacto (ej: .jar)'
         type: string
-        default: '.Jar'
+        default: '.jar'
         required: true
     secrets:
       SYSADMIN_PAT:
@@ -80,7 +80,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: "${{inputs.name}}"
-          path: "${{inputs.build_path}}/${{inputs.name}}.${{inputs.artifact_extension}}"
+          path: "${{inputs.build_path}}/${{inputs.name}}${{inputs.artifact_extension}}"
           retention-days: 1
           if-no-files-found: error 
 
