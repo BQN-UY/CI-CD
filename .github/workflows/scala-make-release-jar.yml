@@ -11,7 +11,7 @@ on:
       build_path:
         type: string
         description: 'Ubicación donde se encontrará el sistema compilado (without leading slash)'
-        default: 'target'
+        default: 'target' # Default is 'target'
         required: false
       name:
         description: name
@@ -82,14 +82,13 @@ jobs:
 
       - name: Build (sbt assembly)
         run: sbt assembly
-        # Este paso generará el JAR con el nombre que incluye -SNAPSHOT
+        # Este paso generará el JAR con el nombre que incluye -SNAPSHOT en target/scala-2.13/
 
       - name: Rename artifact
         run: |
-          # Directorio donde sbt assembly guarda el JAR (target/scala-2.13 por defecto)
-          # Ajusta la ruta si tu assembly lo guarda en otro lugar
-          # Buscamos el archivo generado por assembly que contiene la CURRENT_VERSION
-          jarFile="${{ inputs.build_path }}/scala-2.13/${{ inputs.name }}-${{ env.CURRENT_VERSION }}${{ inputs.artifact_extension }}"
+          # Directorio donde sbt assembly guarda el JAR
+          jarFile="${{ inputs.build_path }}/${{ inputs.name }}-${{ env.CURRENT_VERSION }}${{ inputs.artifact_extension }}"
+          # El destino usa el build_path input
           newJarFile="${{ inputs.build_path }}/${{ inputs.name }}-${{ env.RELEASE_VERSION }}${{ inputs.artifact_extension }}"
 
           echo "Renaming $jarFile to $newJarFile"
@@ -148,14 +147,13 @@ jobs:
 
       - name: Build (sbt assembly)
         run: sbt assembly
-        # Este paso generará el JAR con el nombre que incluye -SNAPSHOT
+        # Este paso generará el JAR con el nombre que incluye -SNAPSHOT en target/scala-2.13/
 
       - name: Rename artifact
         run: |
-          # Directorio donde sbt assembly guarda el JAR (target/scala-2.13 por defecto)
-          # Ajusta la ruta si tu assembly lo guarda en otro lugar
-          # Buscamos el archivo generado por assembly que contiene la CURRENT_VERSION
-          jarFile="${{ inputs.build_path }}/scala-2.13/${{ inputs.name }}-${{ env.CURRENT_VERSION }}${{ inputs.artifact_extension }}"
+          # Directorio donde sbt assembly guarda el JAR 
+          jarFile="${{ inputs.build_path }}/${{ inputs.name }}-${{ env.CURRENT_VERSION }}${{ inputs.artifact_extension }}"
+          # El destino usa el build_path input
           newJarFile="${{ inputs.build_path }}/${{ inputs.name }}-${{ env.RELEASE_VERSION }}${{ inputs.artifact_extension }}"
 
           echo "Renaming $jarFile to $newJarFile"
