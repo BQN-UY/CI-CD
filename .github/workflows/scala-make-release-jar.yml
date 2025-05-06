@@ -202,7 +202,6 @@ jobs:
           artifact_path: '${{inputs.build_path}}/${{inputs.name}}${{ inputs.artifact_extension }}'
           artifact_name: ${{ inputs.name }}
           version: ${{ env.VERSION }}
-        secrets:
           DEPLOY_IP: ${{ secrets.DEPLOY_IP }}
           DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
@@ -220,6 +219,5 @@ jobs:
           jenkins_user: ${{ secrets.JENKINS_USER }}
           sistema: ${{ inputs.name }}
           version: ${{ env.VERSION }}
-        secrets:
           deploy_key: ${{ secrets.DEPLOY_KEY }}
           jenkins_token: ${{ secrets.JENKINS_TOKEN }}
