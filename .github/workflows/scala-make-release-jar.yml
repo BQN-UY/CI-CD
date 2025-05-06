@@ -199,28 +199,25 @@ jobs:
           if-no-files-found: error
 
       - name: Storage Jar
-        uses: ./.github/actions/store-artifact
+        uses: Pendect/action-rsyncer@v2.0.0
+        env:
+          DEPLOY_KEY: ${{secrets.DEPLOY_KEY}}
         with:
-          publisher_path: ${{ secrets.PUBLISHER_PATH }}
-          artifact_path: '${{inputs.build_path}}/${{inputs.name}}${{ inputs.artifact_extension }}'
-          artifact_name: ${{ inputs.name }}
-          version: ${{ env.VERSION }}
-          DEPLOY_IP: ${{ secrets.DEPLOY_IP }}
-          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
-          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-          DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
+          flags: '-avz --delete'
+          options: ''
+          ssh_options: '-p ${{secrets.DEPLOY_PORT}}'
+          src: '${{inputs.build_path}}/${{inputs.name}}-${{env.VERSION}}${{ inputs.artifact_extension }}'
+          dest: '${{ secrets.DEPLOY_USER }}@${{secrets.DEPLOY_IP}}:${{ secrets.PUBLISHER_PATH }}/${{inputs.name}}/versiones/${{inputs.name}}-${{env.VERSION}}.jar'
 
-      ## Llamamos al job de jenkins app-dispatcher
       - name: Executing deloy script
-        uses: ./.github/actions/call-jenkins
+        uses: appleboy/ssh-action@master
         with:
-          deploy_ip: ${{ secrets.DEPLOY_IP }}
-          deploy_port: ${{ secrets.DEPLOY_PORT }}
-          deploy_user: ${{ secrets.DEPLOY_USER }}
-          jenkins_url: ${{ secrets.JENKINS_URL }}
-          jenkins_job_name: ${{ secrets.JENKINS_DEPLOY_JOB }} # Usamos el valor de tu secret
-          jenkins_user: ${{ secrets.JENKINS_USER }}
-          sistema: ${{ inputs.name }}
-          version: ${{ env.VERSION }}
-          deploy_key: ${{ secrets.DEPLOY_KEY }}
-          jenkins_token: ${{ secrets.JENKINS_TOKEN }}
+          host: ${{ secrets.DEPLOY_IP }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_KEY }}
+          port: ${{ secrets.DEPLOY_PORT }}
+          script: |
+            # Curl para el crumbs
+            crumb=$(curl -u "${{ secrets.JENKINS_USER }}:${{ secrets.JENKINS_TOKEN }}" -s '${{ secrets.JENKINS_URL }}/crumbIssuer/api/json')
+            # Curl para ejecutar
+            curl -u "${{ secrets.JENKINS_USER }}:${{ secrets.JENKINS_TOKEN }}" -H "$crumb" -X POST '${{ secrets.JENKINS_URL }}/${{ secrets.JENKINS_DEPLOY_JOB }}/buildWithParameters?SISTEMA=${{inputs.name}}&VERSION=${{env.VERSION}}'
