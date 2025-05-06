@@ -76,6 +76,9 @@ jobs:
       #     git config --global user.email github-actions@github.com
       #     sbt "release with-defaults"
 
+      - name: Build
+        run: sbt assembly
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
