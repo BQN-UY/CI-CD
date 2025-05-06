@@ -1,4 +1,4 @@
-name: scala-make-release-web
+name: scala-make-release-jar
 
 on:
   workflow_call:
