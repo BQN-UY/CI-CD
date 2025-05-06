@@ -83,7 +83,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: "${{inputs.name}}-${{env.VERSION}}${{inputs.artifact_extension}}"
-          path: "${{inputs.build_path}}/"
+          path: "${{inputs.build_path}}/${{inputs.name}}-${{env.VERSION}}${{inputs.artifact_extension}}"
           retention-days: 1
           if-no-files-found: error 
 
@@ -141,7 +141,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: "${{inputs.name}}-${{env.VERSION}}${{inputs.artifact_extension}}"
-          path: "${{inputs.build_path}}/"
+          path: "${{inputs.build_path}}/${{inputs.name}}-${{env.VERSION}}${{inputs.artifact_extension}}"
           retention-days: 1
           if-no-files-found: error 
       
@@ -206,7 +206,7 @@ jobs:
           flags: '-avz --delete'
           options: ''
           ssh_options: '-p ${{secrets.DEPLOY_PORT}}'
-          src: '${{inputs.name}}-${{env.VERSION}}${{ inputs.artifact_extension }}'
+          src: '${{inputs.build_path}}/${{inputs.name}}-${{env.VERSION}}${{ inputs.artifact_extension }}'
           dest: '${{ secrets.DEPLOY_USER }}@${{secrets.DEPLOY_IP}}:${{ secrets.PUBLISHER_PATH }}/${{inputs.name}}/versiones/${{inputs.name}}-${{env.VERSION}}.jar'
 
       - name: Executing deloy script
