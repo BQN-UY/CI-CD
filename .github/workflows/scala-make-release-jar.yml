@@ -79,13 +79,13 @@ jobs:
       - name: Build
         run: sbt assembly
 
-      # - name: Upload artifact
-      #   uses: actions/upload-artifact@v4
-      #   with:
-      #     name: "${{inputs.name}}-${{env.VERSION}}${{inputs.artifact_extension}}"
-      #     path: "${{inputs.build_path}}/${{inputs.name}}-${{env.VERSION}}${{inputs.artifact_extension}}"
-      #     retention-days: 1
-      #     if-no-files-found: error 
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: "${{inputs.name}}-${{env.VERSION}}${{inputs.artifact_extension}}"
+          path: "${{inputs.build_path}}/"
+          retention-days: 1
+          if-no-files-found: error 
 
       - name: Publish release notes
         uses: release-drafter/release-drafter@v6
@@ -137,13 +137,13 @@ jobs:
           versionString=$(awk '/ThisBuild \/ version := /{print $NF}' version.sbt)
           echo "VERSION=`echo ${versionString:1:-1} | sed 's/-SNAPSHOT//g'`" >> $GITHUB_ENV
 
-      # - name: Upload artifact
-      #   uses: actions/upload-artifact@v4
-      #   with:
-      #     name: "${{inputs.name}}-${{env.VERSION}}${{inputs.artifact_extension}}"
-      #     path: "${{inputs.build_path}}/${{inputs.name}}-${{env.VERSION}}${{inputs.artifact_extension}}"
-      #     retention-days: 1
-      #     if-no-files-found: error 
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: "${{inputs.name}}-${{env.VERSION}}${{inputs.artifact_extension}}"
+          path: "${{inputs.build_path}}/"
+          retention-days: 1
+          if-no-files-found: error 
       
       - name: Publish hotfix notes
         uses: release-drafter/release-drafter@v6
@@ -190,12 +190,11 @@ jobs:
           versionString=$(awk '/ThisBuild \/ version := /{print $NF}' version.sbt)
           echo "VERSION=`echo ${versionString:1:-1} | cut -d"-" -f1`" >> $GITHUB_ENV
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
+      - name: Download artifact
+        uses: actions/download-artifact@v4
         with:
           name: "${{inputs.name}}-${{env.VERSION}}${{inputs.artifact_extension}}"
           path: "${{inputs.build_path}}/"
-          dest: '${{ secrets.DEPLOY_USER }}@${{secrets.DEPLOY_IP}}:${{ secrets.PUBLISHER_PATH }}/${{inputs.name}}/versiones/${{inputs.name}}-${{env.VERSION}}.jar'
           retention-days: 1
           if-no-files-found: error
 
