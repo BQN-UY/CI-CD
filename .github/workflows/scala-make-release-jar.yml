@@ -1,4 +1,4 @@
-name: scala-make-release-web
+name: scala-make-release-jar
 
 on:
   workflow_call:
@@ -18,9 +18,9 @@ on:
         required: true
         type: string
       artifact_extension:
-        description: 'Extensión del artifacto (ej: .war (default), .jar)'
+        description: 'Extensión del artifacto (ej: .jar)'
         type: string
-        default: '.war'
+        default: '.jar'
         required: true
     secrets:
       SYSADMIN_PAT:
@@ -76,11 +76,19 @@ jobs:
           git config --global user.email github-actions@github.com
           sbt "release with-defaults"
 
+      - name: Push changes
+        uses: ad-m/github-push-action@master
+        with:
+          github_token: ${{ secrets.SYSADMIN_PAT }}
+          branch: ${{ github.ref }}
+          tags: true
+          force: true
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: "${{inputs.name}}"
-          path: "${{inputs.build_path}}/${{inputs.name}}.${{inputs.artifact_extension}}"
+          name: "${{inputs.name}}-${{env.VERSION}}${{inputs.artifact_extension}}"
+          path: "${{inputs.build_path}}/${{inputs.name}}-${{env.VERSION}}${{inputs.artifact_extension}}"
           retention-days: 1
           if-no-files-found: error 
 
@@ -112,14 +120,16 @@ jobs:
           token: ${{ secrets.SYSADMIN_PAT }}
           jdk-version: ${{ inputs.jdk-version }}
 
+      - name: Get current version
+        run: |
+          versionString=$(awk '/ThisBuild \/ version := /{print $NF}' version.sbt)
+          echo "VERSION=`echo ${versionString:1:-1} | sed 's/-SNAPSHOT//g'`" >> $GITHUB_ENV
+
       - name: Release Hotfix
         run: |
           git config --global user.name github-actions
           git config --global user.email github-actions@github.com
           sbt release-hotfix
-
-      - name: Build
-        run: sbt package
 
       - name: Push changes
         uses: ad-m/github-push-action@master
@@ -129,16 +139,11 @@ jobs:
           tags: true
           force: true
 
-      - name: Get current version
-        run: |
-          versionString=$(awk '/ThisBuild \/ version := /{print $NF}' version.sbt)
-          echo "VERSION=`echo ${versionString:1:-1} | sed 's/-SNAPSHOT//g'`" >> $GITHUB_ENV
-
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: "${{inputs.name}}"
-          path: "${{inputs.build_path}}/${{inputs.name}}.${{inputs.artifact_extension}}"
+          name: "${{inputs.name}}-${{env.VERSION}}${{inputs.artifact_extension}}"
+          path: "${{inputs.build_path}}/${{inputs.name}}-${{env.VERSION}}${{inputs.artifact_extension}}"
           retention-days: 1
           if-no-files-found: error 
       
@@ -187,15 +192,15 @@ jobs:
           versionString=$(awk '/ThisBuild \/ version := /{print $NF}' version.sbt)
           echo "VERSION=`echo ${versionString:1:-1} | cut -d"-" -f1`" >> $GITHUB_ENV
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
+      - name: Download artifact
+        uses: actions/download-artifact@v4
         with:
-          name: "${{inputs.name}}"
-          path: "${{inputs.build_path}}/${{inputs.name}}${{ inputs.artifact_extension }}"
+          name: "${{inputs.name}}-${{env.VERSION}}${{inputs.artifact_extension}}"
+          path: "${{inputs.build_path}}/"
           retention-days: 1
           if-no-files-found: error
 
-      - name: Storage War
+      - name: Storage Jar
         uses: Pendect/action-rsyncer@v2.0.0
         env:
           DEPLOY_KEY: ${{secrets.DEPLOY_KEY}}
