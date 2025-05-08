@@ -6,7 +6,7 @@ on:
       jdk-version:
         type: string
         description: 'jdk version'
-        default: '8'
+        default: '17'
         required: false
       build_path:
         type: string
