@@ -12,7 +12,7 @@ on:
         required: false
         description: 'Run or skip unit test'
         type: string
-        default: "true"
+        default: 'true'
     secrets:
       SYSADMIN_PAT:
         required: true
@@ -34,7 +34,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.SYSADMIN_PAT }}
 
   u-tests:
-    if: "((${{ inputs.run-utest == 'true' }}) && !(contains(github.event.head_commit.message, 'ci:') || contains(github.event.head_commit.message, '(ci)')))"
+    if: "(${{ inputs.run-utest == 'true' }} && !(contains(github.event.head_commit.message, 'ci:') || contains(github.event.head_commit.message, '(ci)')))"
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
