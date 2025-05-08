@@ -13,7 +13,6 @@ on:
         description: 'Run or skip unit test'
         type: boolean
         default: true
-        description: 'Run or skip unit test'
     secrets:
       SYSADMIN_PAT:
         required: true
