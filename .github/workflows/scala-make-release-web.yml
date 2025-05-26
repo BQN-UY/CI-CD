@@ -21,7 +21,7 @@ on:
         description: 'Extensión del artifacto (ej: .war (default), .jar)'
         type: string
         default: '.war'
-        required: true
+        required: false
     secrets:
       SYSADMIN_PAT:
         required: true
