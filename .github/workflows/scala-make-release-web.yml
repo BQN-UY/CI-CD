@@ -187,11 +187,11 @@ jobs:
           versionString=$(awk '/ThisBuild \/ version := /{print $NF}' version.sbt)
           echo "VERSION=`echo ${versionString:1:-1} | cut -d"-" -f1`" >> $GITHUB_ENV
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
+      - name: Download artifact
+        uses: actions/download-artifact@v4
         with:
-          name: "${{inputs.name}}"
-          path: "${{inputs.build_path}}/${{inputs.name}}${{ inputs.artifact_extension }}"
+          name: "${{inputs.name}}${{inputs.artifact_extension}}"
+          path: "${{inputs.build_path}}/"
           retention-days: 1
           if-no-files-found: error
 
@@ -203,7 +203,7 @@ jobs:
           flags: '-avz --delete'
           options: ''
           ssh_options: '-p ${{secrets.DEPLOY_PORT}}'
-          src: '${{inputs.build_path}}/${{inputs.name}}-${{env.VERSION}}${{ inputs.artifact_extension }}'
+          src: '${{inputs.build_path}}/${{inputs.name}}${{ inputs.artifact_extension }}'
           dest: '${{ secrets.DEPLOY_USER }}@${{secrets.DEPLOY_IP}}:${{ secrets.PUBLISHER_PATH }}/${{inputs.name}}/versiones/${{inputs.name}}-${{env.VERSION}}${{ inputs.artifact_extension }}'
 
       - name: Executing deloy script
