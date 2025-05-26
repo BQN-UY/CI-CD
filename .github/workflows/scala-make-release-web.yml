@@ -79,7 +79,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: "${{inputs.name}}"
+          name: "${{inputs.name}}${{inputs.artifact_extension}}"
           path: "${{inputs.build_path}}/${{inputs.name}}${{inputs.artifact_extension}}"
           retention-days: 1
           if-no-files-found: error 
@@ -137,7 +137,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: "${{inputs.name}}"
+          name: "${{inputs.name}}${{inputs.artifact_extension}}"
           path: "${{inputs.build_path}}/${{inputs.name}}${{inputs.artifact_extension}}"
           retention-days: 1
           if-no-files-found: error 
