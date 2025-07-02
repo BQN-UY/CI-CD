@@ -211,7 +211,7 @@ jobs:
           src: '${{inputs.build_path}}/${{inputs.name}}-${{env.VERSION}}${{ inputs.artifact_extension }}'
           dest: '${{ secrets.DEPLOY_USER }}@${{secrets.DEPLOY_IP}}:${{ secrets.PUBLISHER_PATH }}/${{inputs.name}}/versiones/${{inputs.name}}-${{env.VERSION}}${{ inputs.artifact_extension }}'
 
-      - name: Executing deloy script
+      - name: Executing deploy script
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.DEPLOY_IP }}
