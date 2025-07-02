@@ -192,8 +192,6 @@ jobs:
         with:
           name: "${{inputs.name}}${{inputs.artifact_extension}}"
           path: "${{inputs.build_path}}/"
-          retention-days: 1
-          if-no-files-found: error
 
       - name: Storage War
         uses: Pendect/action-rsyncer@v2.0.0
