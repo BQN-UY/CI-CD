@@ -193,7 +193,7 @@ jobs:
           echo "VERSION=`echo ${versionString:1:-1} | cut -d"-" -f1`" >> $GITHUB_ENV
 
       - name: Download artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: "${{inputs.name}}-${{env.VERSION}}${{inputs.artifact_extension}}"
           path: "${{inputs.build_path}}/"
