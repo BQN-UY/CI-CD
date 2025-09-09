@@ -77,7 +77,7 @@ jobs:
         env:
           DEPLOY_KEY: ${{secrets.DEPLOY_KEY}}
         with:
-          flags: '-avz --delete'
+          flags: '-rlptvz --delete'
           options: ''
           ssh_options: '-p ${{secrets.DEPLOY_PORT}}'
           src: '${{inputs.build_path}}/${{inputs.name}}-${{env.VERSION}}.jar'
