@@ -85,7 +85,7 @@ jobs:
           force: true
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: "${{inputs.name}}-${{env.VERSION}}${{inputs.artifact_extension}}"
           path: "${{inputs.build_path}}/${{inputs.name}}-${{env.VERSION}}${{inputs.artifact_extension}}"
@@ -140,7 +140,7 @@ jobs:
           force: true
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: "${{inputs.name}}-${{env.VERSION}}${{inputs.artifact_extension}}"
           path: "${{inputs.build_path}}/${{inputs.name}}-${{env.VERSION}}${{inputs.artifact_extension}}"
