@@ -1,0 +1,27 @@
+{
+  "output": {
+    "filePath": "/tmp/ci-cd-bundle.xml",
+    "style": "xml",
+    "removeComments": false,
+    "includeInstruction": true,
+    "instruction": "Estas son las tareas de CI/CD utilizadas en el proyecto. POR FAVOR, lee primero los archivos del directorio 'docs' para entender la arquitectura y las reglas de negocio antes de analizar el código. Responde siempre en español."
+  },
+  "include": [
+    "src/main/scala/**/*.scala",
+    "src/main/resources/**/*.conf",
+    "docs/**/*.md",
+    "build.sbt",
+    "*.sbt"
+  ],
+  "ignore": {
+    "useGitignore": true,
+    "customPatterns": [
+      "**/target/**",
+      "**/project/target/**",
+      "**/.metals/**",
+      "**/test/**",
+      "**/examples/**",
+      "**/.bsp/**"
+    ]
+  }
+}
