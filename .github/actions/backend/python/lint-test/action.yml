@@ -1,0 +1,36 @@
+name: Python lint & test
+description: Ruff lint + format + mypy + pytest
+
+inputs:
+  python-version:
+    description: Versión de Python
+    default: "3.12"
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+        cache: pip
+
+    - name: Install deps
+      shell: bash
+      run: pip install -r requirements.txt -r requirements-dev.txt
+
+    - name: Lint (Ruff)
+      shell: bash
+      run: ruff check .
+
+    - name: Format check (Ruff format)
+      shell: bash
+      run: ruff format --check .
+
+    - name: Type check (mypy)
+      shell: bash
+      run: mypy .
+
+    - name: Tests (pytest)
+      shell: bash
+      run: pytest --tb=short -q

@@ -1,0 +1,25 @@
+name: Git back-merge
+description: Mergea rama origen a destino sin conflictos de versión
+
+inputs:
+  source:
+    description: Rama de origen (ej. main)
+    required: true
+  target:
+    description: Rama de destino (ej. develop)
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Back-merge ${{ inputs.source }} → ${{ inputs.target }}
+      shell: bash
+      run: |
+        git config user.name  "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git fetch origin
+        git checkout ${{ inputs.target }}
+        git merge origin/${{ inputs.source }} --no-edit \
+          -m "chore: back-merge ${{ inputs.source }} → \
+          ${{ inputs.target }} [skip ci]"
+        git push origin ${{ inputs.target }}

@@ -1,0 +1,24 @@
+name: Label check
+description: Verifica label obligatorio en el PR
+
+inputs:
+  github-token:
+    description: GITHUB_TOKEN del repo que invoca
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Check PR label
+      uses: mheap/github-action-required-labels@v5
+      with:
+        mode: exactly
+        count: 1
+        labels: |
+          breaking-change
+          feature
+          fix
+          chore
+          deploy-action
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}

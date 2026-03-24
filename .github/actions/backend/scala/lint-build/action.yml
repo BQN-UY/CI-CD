@@ -1,0 +1,35 @@
+name: Scala lint & build
+description: scalafmt + sbt compile + sbt test (sin version.sbt)
+
+inputs:
+  java-version:
+    description: Versión de Java
+    default: "21"
+  scala-version:
+    description: Versión de Scala
+    default: "3.4.2"
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: ${{ inputs.java-version }}
+        cache: sbt
+
+    - name: Setup sbt
+      uses: sbt/setup-sbt@v1
+
+    - name: Format check (scalafmt)
+      shell: bash
+      run: sbt scalafmtCheckAll
+
+    - name: Compile
+      shell: bash
+      run: sbt compile
+
+    - name: Test
+      shell: bash
+      run: sbt test

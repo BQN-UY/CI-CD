@@ -1,0 +1,28 @@
+name: Flutter lint & test
+description: flutter analyze + flutter test
+
+inputs:
+  flutter-version:
+    description: Versión de Flutter
+    default: "stable"
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: ${{ inputs.flutter-version }}
+        cache: true
+
+    - name: Install deps
+      shell: bash
+      run: flutter pub get
+
+    - name: Analyze
+      shell: bash
+      run: flutter analyze
+
+    - name: Test
+      shell: bash
+      run: flutter test

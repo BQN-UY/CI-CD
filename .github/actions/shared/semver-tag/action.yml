@@ -1,0 +1,57 @@
+name: SemVer tag
+description: Calcula y crea tag SemVer desde historial Git
+
+inputs:
+  bump:
+    description: major | minor | patch
+    required: true
+    default: minor
+  prefix:
+    description: Prefijo del tag
+    default: v
+  dry-run:
+    description: Si es true, solo calcula la versión sin crear el tag
+    default: "false"
+
+outputs:
+  version:
+    description: Versión sin prefijo (ej. 1.3.0)
+    value: ${{ steps.calc.outputs.version }}
+  tag:
+    description: Tag completo (ej. v1.3.0)
+    value: ${{ steps.calc.outputs.tag }}
+
+runs:
+  using: composite
+  steps:
+    - name: Fetch tags
+      shell: bash
+      run: git fetch --tags --prune
+
+    - name: Calculate version
+      id: calc
+      shell: bash
+      run: |
+        LATEST=$(git tag --list "${{ inputs.prefix }}*" \
+          --sort=-version:refname | head -n1)
+        LATEST=${LATEST:-${{ inputs.prefix }}0.0.0}
+        VERSION=${LATEST#${{ inputs.prefix }}}
+        IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+        case "${{ inputs.bump }}" in
+          major) MAJOR=$((MAJOR+1)); MINOR=0; PATCH=0 ;;
+          minor) MINOR=$((MINOR+1)); PATCH=0 ;;
+          patch) PATCH=$((PATCH+1)) ;;
+        esac
+        NEW="$MAJOR.$MINOR.$PATCH"
+        echo "version=$NEW" >> $GITHUB_OUTPUT
+        echo "tag=${{ inputs.prefix }}$NEW" >> $GITHUB_OUTPUT
+
+    - name: Create and push tag
+      if: ${{ inputs.dry-run != 'true' }}
+      shell: bash
+      run: |
+        git config user.name  "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git tag -a "${{ steps.calc.outputs.tag }}" \
+          -m "Release ${{ steps.calc.outputs.tag }}"
+        git push origin "${{ steps.calc.outputs.tag }}"

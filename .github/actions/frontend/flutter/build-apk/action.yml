@@ -1,0 +1,32 @@
+name: Flutter build APK/IPA/web
+description: Compila artefactos Flutter para Android, iOS y web
+
+inputs:
+  flutter-version:
+    description: Versión de Flutter
+    default: "stable"
+  target:
+    description: apk | ios | web
+    default: apk
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: ${{ inputs.flutter-version }}
+        cache: true
+
+    - name: Install deps
+      shell: bash
+      run: flutter pub get
+
+    - name: Build
+      shell: bash
+      run: |
+        case "${{ inputs.target }}" in
+          apk) flutter build apk --release ;;
+          ios) flutter build ios --release --no-codesign ;;
+          web) flutter build web --release ;;
+        esac

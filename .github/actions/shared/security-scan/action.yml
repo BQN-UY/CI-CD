@@ -1,0 +1,25 @@
+name: Security scan
+description: OpenGrep (SAST) + BetterLeaks (secrets)
+
+runs:
+  using: composite
+  steps:
+    - name: OpenGrep SAST
+      shell: bash
+      run: |
+        pip install opengrep --quiet
+        opengrep scan --config auto --error \
+          --output results-sast.sarif --sarif 2>/dev/null || true
+        opengrep scan --config auto --error .
+
+    - name: Upload SARIF
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: results-sast.sarif
+      continue-on-error: true
+
+    - name: BetterLeaks
+      shell: bash
+      run: |
+        pip install betterleaks --quiet
+        betterleaks scan --fail-on-findings .
