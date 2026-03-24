@@ -135,9 +135,10 @@ No requiere inputs — opera sobre el checkout actual.
 
 ### 3.3 `shared/semver-tag`
 
-Calcula el próximo tag SemVer 2.0 leyendo el historial de Git y lo crea firmado.
+Calcula el próximo tag SemVer 2.0 leyendo el historial de Git y crea un tag anotado (no firmado con GPG).
 El tipo de bump (`major` / `minor` / `patch`) lo elige el desarrollador al disparar
-`make-release`.
+`make-release`. Si se requieren tags firmados con GPG, el manejo de claves y la firma
+deben implementarse en el workflow que invoca esta action.
 
 **Inputs:**
 

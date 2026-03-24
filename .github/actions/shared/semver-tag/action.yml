@@ -32,15 +32,27 @@ runs:
       id: calc
       shell: bash
       run: |
+        set -euo pipefail
+
         LATEST=$(git tag --list "${{ inputs.prefix }}*" \
           --sort=-version:refname | head -n1)
         LATEST=${LATEST:-${{ inputs.prefix }}0.0.0}
         VERSION=${LATEST#${{ inputs.prefix }}}
+
+        if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          echo "Error: latest tag '$LATEST' does not contain a valid SemVer version (X.Y.Z) after prefix '${{ inputs.prefix }}'." >&2
+          exit 1
+        fi
+
         IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
         case "${{ inputs.bump }}" in
           major) MAJOR=$((MAJOR+1)); MINOR=0; PATCH=0 ;;
           minor) MINOR=$((MINOR+1)); PATCH=0 ;;
           patch) PATCH=$((PATCH+1)) ;;
+          *)
+            echo "Error: invalid bump value '${{ inputs.bump }}'. Expected one of: major, minor, patch." >&2
+            exit 1
+            ;;
         esac
         NEW="$MAJOR.$MINOR.$PATCH"
         echo "version=$NEW" >> $GITHUB_OUTPUT

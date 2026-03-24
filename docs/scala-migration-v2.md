@@ -403,7 +403,7 @@ El nombre de los artefactos cambia solo para los **snapshots**. Los releases son
 | Release  | `1.5.0`          | `1.5.0` ✓ igual  |
 
 Si algún otro proyecto consume snapshots de este repo por nombre de versión exacto,
-actualizar esa referencia para que use la convensión de sbt-dynver antes de migrar.
+actualizar esa referencia para que use la convención de sbt-dynver antes de migrar.
 
 ---
 

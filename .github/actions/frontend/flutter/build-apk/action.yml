@@ -1,12 +1,12 @@
 name: Flutter build APK/IPA/web
-description: Compila artefactos Flutter para Android, iOS y web
+description: Compila artefactos Flutter para Android (APK), iOS (IPA) y web
 
 inputs:
   flutter-version:
     description: Versión de Flutter
     default: "stable"
   target:
-    description: apk | ios | web
+    description: apk | ipa | web
     default: apk
 
 runs:
@@ -27,6 +27,6 @@ runs:
       run: |
         case "${{ inputs.target }}" in
           apk) flutter build apk --release ;;
-          ios) flutter build ios --release --no-codesign ;;
+          ipa) flutter build ipa --release ;;
           web) flutter build web --release ;;
         esac
