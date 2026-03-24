@@ -5,9 +5,6 @@ inputs:
   java-version:
     description: Versión de Java
     default: "21"
-  scala-version:
-    description: Versión de Scala
-    default: "3.4.2"
 
 runs:
   using: composite

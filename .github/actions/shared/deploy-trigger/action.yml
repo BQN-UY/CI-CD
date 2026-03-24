@@ -15,6 +15,17 @@ inputs:
 runs:
   using: composite
   steps:
+    - name: Validate environment
+      shell: bash
+      run: |
+        case "${{ inputs.environment }}" in
+          dev|staging|production) ;;
+          *)
+            echo "Error: invalid environment '${{ inputs.environment }}'. Expected one of: dev, staging, production." >&2
+            exit 1
+            ;;
+        esac
+
     - name: Trigger deploy
       shell: bash
       run: |
@@ -32,6 +43,6 @@ runs:
             "actor": "${{ github.actor }}"
           }')
         if [ "$HTTP_STATUS" != "200" ] && [ "$HTTP_STATUS" != "204" ]; then
-          echo "Webhook failed — HTTP $HTTP_STATUS (url: ${{ inputs.service-url }})" >&2
+          echo "Webhook failed — HTTP $HTTP_STATUS" >&2
           exit 1
         fi
