@@ -1,0 +1,47 @@
+name: Flutter build APK/IPA/web
+description: Compila artefactos Flutter para Android (APK), iOS (IPA) y web
+
+inputs:
+  flutter-version:
+    description: Versión de Flutter
+    default: "stable"
+  target:
+    description: apk | ipa | web
+    default: apk
+  no-codesign:
+    description: >
+      Para target=ipa, omitir el code signing (útil en CI sin certificados).
+      Pasar 'false' solo si el runner tiene provisioning profiles configurados.
+    default: "true"
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: ${{ inputs.flutter-version }}
+        cache: true
+
+    - name: Install deps
+      shell: bash
+      run: flutter pub get
+
+    - name: Build
+      shell: bash
+      run: |
+        case "${{ inputs.target }}" in
+          apk) flutter build apk --release ;;
+          ipa)
+            if [ "${RUNNER_OS}" != "macOS" ]; then
+              echo "::error::Building an iOS IPA requires a macOS runner with Xcode installed. Current runner OS: ${RUNNER_OS}"
+              exit 1
+            fi
+            if [ "${{ inputs.no-codesign }}" = "true" ]; then
+              flutter build ipa --release --no-codesign
+            else
+              flutter build ipa --release
+            fi
+            ;;
+          web) flutter build web --release ;;
+        esac

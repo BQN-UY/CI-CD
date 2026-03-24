@@ -1,0 +1,25 @@
+name: Vaadin lint & build
+description: Maven + Checkstyle + Java build
+
+inputs:
+  java-version:
+    description: Versión de Java
+    default: "21"
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: ${{ inputs.java-version }}
+        cache: maven
+
+    - name: Checkstyle
+      shell: bash
+      run: mvn checkstyle:check --no-transfer-progress
+
+    - name: Compile & test
+      shell: bash
+      run: mvn verify --no-transfer-progress -Dvaadin.productionMode=true

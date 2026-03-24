@@ -1,0 +1,32 @@
+name: Node.js lint & test
+description: ESLint + Jest/Vitest
+
+inputs:
+  node-version:
+    description: Versión de Node.js
+    default: "20"
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Node
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+        cache: npm
+
+    - name: Install deps
+      shell: bash
+      run: npm ci
+
+    - name: Lint (ESLint)
+      shell: bash
+      run: npx eslint . --max-warnings=0
+
+    - name: Format check (Prettier)
+      shell: bash
+      run: npx prettier --check .
+
+    - name: Tests
+      shell: bash
+      run: npm test
