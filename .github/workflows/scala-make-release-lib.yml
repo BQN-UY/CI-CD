@@ -26,13 +26,13 @@ jobs:
     outputs:
       changed-scala-files: ${{ steps.changed-scala-files.outputs.any_changed }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 2
 
       - name: Get scala changed files
         id: changed-scala-files
-        uses: tj-actions/changed-files@v46
+        uses: tj-actions/changed-files@v47
         with:
           dir_names: "true"
           files: |
