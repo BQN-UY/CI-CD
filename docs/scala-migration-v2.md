@@ -18,7 +18,7 @@ Guía paso a paso para migrar un repositorio Scala/Pekko desde el modelo v1
 
 - La versión vive en el **tag de Git**. No existe `version.sbt`.
 - `sbt-dynver` calcula la versión en build-time leyendo el historial Git.
-- El deploy se dispara via webhook HTTP.
+- El deploy se dispara vía webhook HTTP.
 - Los workflows del proyecto invocan composite actions del CI-CD repo.
 
 | Situación | Versión calculada por sbt-dynver |
@@ -49,7 +49,7 @@ cat version.sbt
 ```
 
 La regla es simple: si dice `X.Y.Z-SNAPSHOT`, la última release publicada fue `X.Y.(Z-1)`
-o bien `X.(Y-1).ultimo` según el ciclo de sbt-release que se haya usado.
+o bien `X.(Y-1).último` según el ciclo de sbt-release que se haya usado.
 Confirmarlo revisando el historial de releases en GitHub o Nexus.
 
 ---

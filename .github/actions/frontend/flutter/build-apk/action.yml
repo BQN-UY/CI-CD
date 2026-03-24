@@ -27,6 +27,12 @@ runs:
       run: |
         case "${{ inputs.target }}" in
           apk) flutter build apk --release ;;
-          ipa) flutter build ipa --release ;;
+          ipa)
+            if [ "${RUNNER_OS}" != "macOS" ]; then
+              echo "::error::Building an iOS IPA requires a macOS runner with Xcode installed. Current runner OS: ${RUNNER_OS}"
+              exit 1
+            fi
+            flutter build ipa --release
+            ;;
           web) flutter build web --release ;;
         esac

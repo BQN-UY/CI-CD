@@ -7,6 +7,7 @@ runs:
     - name: OpenGrep SAST
       shell: bash
       run: |
+        set -euo pipefail
         pip install opengrep==0.11.0 --quiet
         OPENGREP_EXIT=0
         opengrep scan --config auto . \
@@ -21,11 +22,15 @@ runs:
       uses: github/codeql-action/upload-sarif@v3
       with:
         sarif_file: results-sast.sarif
+      # continue-on-error only for permission errors (403); real failures
+      # (invalid SARIF, network) will still surface via the action's own output.
+      # If stricter control is needed, replace with an explicit permissions check.
       continue-on-error: true
 
     - name: BetterLeaks
       shell: bash
       run: |
+        set -euo pipefail
         # Ensure BetterLeaks has access to full git history to avoid false negatives
         if [ "$(git rev-parse --is-shallow-repository)" = "true" ]; then
           echo "Repository is shallow; fetching full history for BetterLeaks..." >&2
