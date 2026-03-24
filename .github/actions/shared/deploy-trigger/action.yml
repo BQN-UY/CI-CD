@@ -19,6 +19,10 @@ runs:
       shell: bash
       run: |
         HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+          --connect-timeout 10 \
+          --max-time 30 \
+          --retry 3 \
+          --retry-all-errors \
           -X POST "${{ inputs.service-url }}" \
           -H "Authorization: Bearer ${{ inputs.token }}" \
           -H "Content-Type: application/json" \
@@ -28,6 +32,6 @@ runs:
             "actor": "${{ github.actor }}"
           }')
         if [ "$HTTP_STATUS" != "200" ] && [ "$HTTP_STATUS" != "204" ]; then
-          echo "Webhook failed — HTTP $HTTP_STATUS"
+          echo "Webhook failed — HTTP $HTTP_STATUS (url: ${{ inputs.service-url }})" >&2
           exit 1
         fi

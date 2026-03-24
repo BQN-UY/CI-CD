@@ -287,6 +287,9 @@ jobs:
     name: Tag + Nexus + GitHub Release + deploy + back-merge
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
+    permissions:
+      contents: write          # requerido para crear tags y hacer push de ramas
+      security-events: write   # requerido para subir SARIF al tab de Security
     steps:
       - uses: actions/checkout@v4
         with:

@@ -19,7 +19,6 @@ runs:
         git config user.email "github-actions[bot]@users.noreply.github.com"
         git fetch origin
         git checkout -B ${{ inputs.target }} origin/${{ inputs.target }}
-        git merge origin/${{ inputs.source }} --no-edit \
-          -m "chore: back-merge ${{ inputs.source }} → \
-          ${{ inputs.target }} [skip ci]"
+        git merge origin/${{ inputs.source }} --no-ff \
+          -m "chore: back-merge ${{ inputs.source }} → ${{ inputs.target }} [skip ci]"
         git push origin ${{ inputs.target }}

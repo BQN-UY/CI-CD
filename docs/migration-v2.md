@@ -126,10 +126,10 @@ el CI falla y el merge queda bloqueado.
 Corre **OpenGrep** (SAST) y **BetterLeaks** (secrets scanning) sobre el código.
 Si encuentra algo, el CI falla y el PR no puede mergearse.
 
-- OpenGrep genera un reporte SARIF que se sube al tab de Security del repo.
+- OpenGrep genera un reporte SARIF y, si el workflow tiene `permissions: security-events: write`, lo sube al tab de *Security* del repo. Si el permiso no está configurado, el análisis corre igual pero el reporte no se publica.
 - BetterLeaks falla con `--fail-on-findings` si detecta un secreto.
 
-No requiere inputs — opera sobre el checkout actual.
+No requiere inputs — opera sobre el checkout actual. Para que el upload de SARIF funcione, el workflow que la invoca debe declarar `permissions: security-events: write`.
 
 ---
 
@@ -139,6 +139,10 @@ Calcula el próximo tag SemVer 2.0 leyendo el historial de Git y crea un tag ano
 El tipo de bump (`major` / `minor` / `patch`) lo elige el desarrollador al disparar
 `make-release`. Si se requieren tags firmados con GPG, el manejo de claves y la firma
 deben implementarse en el workflow que invoca esta action.
+
+> **Permisos requeridos:** esta action hace push de tags al repositorio remoto. El workflow
+> que la use debe declarar `permissions: contents: write` (o utilizar un PAT con permisos
+> equivalentes); de lo contrario el push fallará si el `GITHUB_TOKEN` es read-only por defecto.
 
 **Inputs:**
 
