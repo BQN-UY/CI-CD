@@ -19,12 +19,13 @@ runs:
         exit $OPENGREP_EXIT
 
     - name: Upload SARIF
+      id: upload_sarif
       uses: github/codeql-action/upload-sarif@v3
       with:
         sarif_file: results-sast.sarif
-      # continue-on-error only for permission errors (403); real failures
-      # (invalid SARIF, network) will still surface via the action's own output.
-      # If stricter control is needed, replace with an explicit permissions check.
+      # continue-on-error tolera repos sin permissions: security-events: write.
+      # Errores de red o SARIF inválido también quedan silenciados aquí;
+      # el análisis OpenGrep ya falló correctamente en el step anterior si hubo hallazgos.
       continue-on-error: true
 
     - name: BetterLeaks

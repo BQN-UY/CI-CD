@@ -8,6 +8,11 @@ inputs:
   target:
     description: apk | ipa | web
     default: apk
+  no-codesign:
+    description: >
+      Para target=ipa, omitir el code signing (útil en CI sin certificados).
+      Pasar 'false' solo si el runner tiene provisioning profiles configurados.
+    default: "true"
 
 runs:
   using: composite
@@ -32,7 +37,11 @@ runs:
               echo "::error::Building an iOS IPA requires a macOS runner with Xcode installed. Current runner OS: ${RUNNER_OS}"
               exit 1
             fi
-            flutter build ipa --release
+            if [ "${{ inputs.no-codesign }}" = "true" ]; then
+              flutter build ipa --release --no-codesign
+            else
+              flutter build ipa --release
+            fi
             ;;
           web) flutter build web --release ;;
         esac

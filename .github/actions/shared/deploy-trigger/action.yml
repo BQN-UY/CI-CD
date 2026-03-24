@@ -29,11 +29,14 @@ runs:
     - name: Trigger deploy
       shell: bash
       run: |
-        HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+        # No usar --retry-all-errors en POST para evitar múltiples deploys
+        # ante timeouts o errores 5xx en webhooks no idempotentes.
+        # Solo se reintenta ante errores de conexión (--retry maneja CURLE_* codes).
+        RESPONSE_BODY=$(mktemp)
+        HTTP_STATUS=$(curl -s -w "%{http_code}" -o "$RESPONSE_BODY" \
           --connect-timeout 10 \
           --max-time 30 \
           --retry 3 \
-          --retry-all-errors \
           -X POST "${{ inputs.service-url }}" \
           -H "Authorization: Bearer ${{ inputs.token }}" \
           -H "Content-Type: application/json" \
@@ -44,5 +47,8 @@ runs:
           }')
         if [ "$HTTP_STATUS" != "200" ] && [ "$HTTP_STATUS" != "204" ]; then
           echo "Webhook failed — HTTP $HTTP_STATUS" >&2
+          echo "Response body: $(cat "$RESPONSE_BODY" | head -c 500)" >&2
+          rm -f "$RESPONSE_BODY"
           exit 1
         fi
+        rm -f "$RESPONSE_BODY"
