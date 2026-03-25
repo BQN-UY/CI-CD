@@ -14,6 +14,10 @@ runs:
       with:
         github-token: ${{ inputs.github-token }}
         script: |
+          if (!context.payload.pull_request?.head?.ref) {
+            console.log("Auto label: contexto sin 'pull_request' (este action está pensado para eventos 'pull_request'/'pull_request_target'); se omite auto-label.");
+            return;
+          }
           const branch = context.payload.pull_request.head.ref;
           const map = {
             'feature/': 'feature',

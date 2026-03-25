@@ -143,11 +143,15 @@ Si el branch no coincide con ningún prefijo la action no falla — simplemente 
 |---|---|
 | `github-token` | `GITHUB_TOKEN` del repo que invoca |
 
+> **Permisos requeridos:** esta action llama a `issues.addLabels`. El workflow que la use debe declarar `permissions: issues: write`; de lo contrario fallará en repos con token read-only por defecto.
+
 **Uso en `ci.yml` del proyecto:**
 
 ```yaml
 auto-label:
   runs-on: ubuntu-latest
+  permissions:
+    issues: write
   steps:
     - uses: BQN-UY/CI-CD/.github/actions/shared/auto-label@v2
       with:
