@@ -1,5 +1,5 @@
 name: Security scan
-description: Semgrep (SAST) + BetterLeaks (secrets)
+description: Semgrep (SAST) + detect-secrets (secrets)
 
 runs:
   using: composite
@@ -28,19 +28,30 @@ runs:
       # el análisis Semgrep ya falló correctamente en el step anterior si hubo hallazgos.
       continue-on-error: true
 
-    - name: BetterLeaks
+    - name: Secrets scan
       shell: bash
       run: |
         set -euo pipefail
-        # Ensure BetterLeaks has access to full git history to avoid false negatives
+        # Ensure detect-secrets has access to full git history to avoid false negatives
         if [ "$(git rev-parse --is-shallow-repository)" = "true" ]; then
-          echo "Repository is shallow; fetching full history for BetterLeaks..." >&2
+          echo "Repository is shallow; fetching full history for secrets scan..." >&2
           git fetch --unshallow --tags --prune --no-recurse-submodules 2>/dev/null || \
           git fetch --depth=2147483647 --tags --prune --no-recurse-submodules || {
-            echo "Error: unable to fetch full git history required by BetterLeaks." >&2
+            echo "Error: unable to fetch full git history required for secrets scan." >&2
             echo "Configure actions/checkout with 'fetch-depth: 0' in this workflow." >&2
             exit 1
           }
         fi
-        pip install betterleaks==1.6.0 --quiet
-        betterleaks scan --fail-on-findings .
+        pip install "detect-secrets>=1.4.0,<2.0.0" --quiet
+        detect-secrets scan --all-files . > secrets-baseline.json
+        python3 -c "
+        import json, sys
+        data = json.load(open('secrets-baseline.json'))
+        findings = data.get('results', {})
+        if findings:
+            print(f'Secrets found in {len(findings)} file(s):', file=sys.stderr)
+            for f in findings:
+                print(f'  {f}', file=sys.stderr)
+            sys.exit(1)
+        print('No secrets found.')
+        "
