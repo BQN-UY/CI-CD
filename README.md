@@ -18,7 +18,8 @@ solo definen cuándo disparar cada workflow.
 
 docs/
 ├── migration-v2.md        # Guía de referencia completa de CI/CD v2
-└── scala-migration-v2.md  # Migración paso a paso para repos Scala
+├── scala-migration-v2.md  # Migración paso a paso para repos Scala
+└── workflows-v1.md        # Referencia de workflows v1 (legado, activos hasta marzo 2026)
 ```
 
 ---
@@ -91,6 +92,33 @@ permissions:
 |---|---|
 | [`docs/migration-v2.md`](docs/migration-v2.md) | Guía de referencia completa: estructura, todas las actions, stacks soportados, roles y convenciones |
 | [`docs/scala-migration-v2.md`](docs/scala-migration-v2.md) | Guía paso a paso para migrar repos Scala de `version.sbt` + sbt-release a `sbt-dynver` + Git tags |
+| [`docs/workflows-v1.md`](docs/workflows-v1.md) | Referencia de los workflows v1 en `.github/workflows/` (activos, consumidos por repos que aún no migraron a v2) |
+
+---
+
+## Workflows v1 (legado)
+
+Los workflows en `.github/workflows/` son de tipo `workflow_call` y siguen activos. Son referenciados desde los repos de proyecto como:
+
+```yaml
+uses: BQN-UY/CI-CD/.github/workflows/<nombre>.yml@main
+```
+
+| Workflow | Descripción |
+|---|---|
+| `scala-ci.yml` | CI para proyectos Scala: labeling, unit tests, auto-merge de PRs `update/*` |
+| `scala-deploy-jar.yml` | Build (`sbt assembly`) y deploy de fat JAR vía rsync + Jenkins |
+| `scala-deploy-web.yml` | Build (`sbt package`) y deploy de WAR vía rsync + Jenkins |
+| `scala-make-release-jar.yml` | Release completo de JAR: `sbt release`, push de tags, rsync, Jenkins. Soporta hotfix |
+| `scala-make-release-web.yml` | Release completo de WAR: mismo flujo que la versión JAR |
+| `scala-make-release-lib.yml` | Release de librería Scala publicada en Nexus, con detección de cambios |
+| `scala-publish-snapshot-lib.yml` | Publica snapshot de librería en Nexus (`sbt publish`) |
+| `start-hotfix.yml` | Crea rama de hotfix desde un tag existente e incrementa el patch version |
+| `merge-update.yml` | Labeling y auto-merge de PRs de ramas `update/*` de Dependabot/bqn-sysadmin |
+| `release-drafter.yml` | Genera borrador de release notes leyendo la versión desde `version.sbt` |
+| `remove-old-artifacts.yml` | Limpia artifacts antiguos de GitHub Actions |
+
+Ver detalles completos en [`docs/workflows-v1.md`](docs/workflows-v1.md).
 
 ---
 
