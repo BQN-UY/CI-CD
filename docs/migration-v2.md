@@ -137,6 +137,12 @@ Asigna automáticamente una label al PR según el prefijo del branch. Debe corre
 
 Si el branch no coincide con ningún prefijo la action no falla — simplemente no asigna nada (el developer debe agregar la label manualmente o `label-check` bloqueará el merge).
 
+Si el PR ya tiene alguna de las labels gestionadas (puesta manualmente o por una ejecución anterior), la action no agrega nada para evitar que `label-check` falle por tener más de una label.
+
+PRs desde forks son ignorados por seguridad: la action no intenta modificar labels cuando el head repo no coincide con el repo base.
+
+> **Relación con `.github/labeler.yml`:** la sección 8.2 documenta el uso de `.github/labeler.yml` para auto-etiquetar PRs. Ambos mecanismos son complementarios: `shared/auto-label` cubre el caso simple de etiquetar según el prefijo del branch, mientras que `.github/labeler.yml` permite reglas más avanzadas por archivos modificados. Para migraciones a CI/CD v2 se recomienda usar `shared/auto-label` como opción por defecto y agregar `.github/labeler.yml` solo cuando se necesiten reglas adicionales.
+
 **Input requerido:**
 
 | Input | Descripción |
