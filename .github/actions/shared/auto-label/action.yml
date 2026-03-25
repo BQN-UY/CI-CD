@@ -1,0 +1,36 @@
+name: Auto label
+description: Asigna automáticamente una label al PR según el prefijo del branch
+
+inputs:
+  github-token:
+    description: GITHUB_TOKEN del repo que invoca
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Assign label from branch prefix
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ inputs.github-token }}
+        script: |
+          const branch = context.payload.pull_request.head.ref;
+          const map = {
+            'feature/': 'feature',
+            'fix/':     'fix',
+            'chore/':   'chore',
+            'hotfix/':  'fix',
+            'release/': 'deploy-action',
+          };
+          const label = Object.entries(map).find(([k]) => branch.startsWith(k))?.[1];
+          if (label) {
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              labels: [label],
+            });
+            console.log(`Label '${label}' asignada al PR (branch: ${branch})`);
+          } else {
+            console.log(`Branch '${branch}' no coincide con ningún prefijo conocido — se omite auto-label`);
+          }

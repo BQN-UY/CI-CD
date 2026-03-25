@@ -44,7 +44,9 @@ BQN-UY/CI-CD
         │   │   └── action.yml
         │   ├── deploy-trigger/
         │   │   └── action.yml
-        │   └── label-check/
+        │   ├── label-check/
+        │   │   └── action.yml
+        │   └── auto-label/
         │       └── action.yml
         │
         ├── frontend/
@@ -121,7 +123,48 @@ el CI falla y el merge queda bloqueado.
 
 ---
 
-### 3.2 `shared/security-scan`
+### 3.2 `shared/auto-label`
+
+Asigna automáticamente una label al PR según el prefijo del branch. Debe correr **antes** de `label-check` para que la verificación encuentre la label ya puesta.
+
+| Prefijo de branch | Label asignada |
+|---|---|
+| `feature/` | `feature` |
+| `fix/` | `fix` |
+| `chore/` | `chore` |
+| `hotfix/` | `fix` |
+| `release/` | `deploy-action` |
+
+Si el branch no coincide con ningún prefijo la action no falla — simplemente no asigna nada (el developer debe agregar la label manualmente o `label-check` bloqueará el merge).
+
+**Input requerido:**
+
+| Input | Descripción |
+|---|---|
+| `github-token` | `GITHUB_TOKEN` del repo que invoca |
+
+**Uso en `ci.yml` del proyecto:**
+
+```yaml
+auto-label:
+  runs-on: ubuntu-latest
+  steps:
+    - uses: BQN-UY/CI-CD/.github/actions/shared/auto-label@v2
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+
+label-check:
+  needs: auto-label
+  runs-on: ubuntu-latest
+  steps:
+    - uses: BQN-UY/CI-CD/.github/actions/shared/label-check@v2
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+```
+
+---
+
+### 3.3 `shared/security-scan`
 
 Corre **OpenGrep** (SAST) y **BetterLeaks** (secrets scanning) sobre el código.
 Si encuentra algo, el CI falla y el PR no puede mergearse.
@@ -133,7 +176,7 @@ No requiere inputs — opera sobre el checkout actual. Para que el upload de SAR
 
 ---
 
-### 3.3 `shared/semver-tag`
+### 3.4 `shared/semver-tag`
 
 Calcula el próximo tag SemVer 2.0 leyendo el historial de Git y crea un tag anotado (no firmado con GPG).
 El tipo de bump (`major` / `minor` / `patch`) lo elige el desarrollador al disparar
@@ -161,7 +204,7 @@ deben implementarse en el workflow que invoca esta action.
 
 ---
 
-### 3.4 `shared/git-merge`
+### 3.5 `shared/git-merge`
 
 Realiza un back-merge automático sin conflictos. Al no existir archivos de versión
 (no hay `version.sbt` ni equivalente), este paso siempre es limpio.
@@ -175,7 +218,7 @@ Realiza un back-merge automático sin conflictos. Al no existir archivos de vers
 
 ---
 
-### 3.5 `shared/github-release`
+### 3.6 `shared/github-release`
 
 Crea un GitHub Release con release notes autogeneradas a partir de los PRs incluidos
 y sus labels. Usa `softprops/action-gh-release@v2`.
@@ -188,7 +231,7 @@ y sus labels. Usa `softprops/action-gh-release@v2`.
 
 ---
 
-### 3.6 `shared/deploy-trigger`
+### 3.7 `shared/deploy-trigger`
 
 Dispara el deploy vía webhook HTTP. El `service-url` y el `token` se configuran como
 secrets en cada repo del proyecto. Falla si el webhook devuelve un status distinto de
