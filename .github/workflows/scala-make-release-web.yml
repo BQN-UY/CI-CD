@@ -188,7 +188,7 @@ jobs:
           echo "VERSION=`echo ${versionString:1:-1} | cut -d"-" -f1`" >> $GITHUB_ENV
 
       - name: Download artifact
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: "${{inputs.name}}${{inputs.artifact_extension}}"
           path: "${{inputs.build_path}}/"
