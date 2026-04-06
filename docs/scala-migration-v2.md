@@ -202,7 +202,7 @@ on:
 
 jobs:
   publish:
-    name: Publish JAR snapshot → Nexus + deploy dev
+    name: Publish JAR snapshot → Nexus + deploy dev/staging
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -219,7 +219,7 @@ jobs:
           NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
           NEXUS_URL:      ${{ secrets.NEXUS_URL }}
 
-      - name: Deploy to testing
+      - name: Deploy to dev
         if: github.ref == 'refs/heads/develop'
         uses: BQN-UY/CI-CD/.github/actions/shared/deploy-trigger@v2
         with:

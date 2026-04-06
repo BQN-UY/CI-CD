@@ -273,7 +273,7 @@ secrets en cada repo del proyecto. Falla si el webhook devuelve un status distin
 | `service-url` | URL del webhook de deploy |
 | `token` | Token de autenticación |
 
-> Los repos de proyecto deben tener dos pares de secrets de deploy: `DEV_DEPLOY_WEBHOOK_URL` / `DEV_DEPLOY_TOKEN` para el deploy automático desde `publish-and-deploy.yml`, y `DEPLOY_WEBHOOK_URL` / `DEPLOY_TOKEN` para el deploy manual desde `make-release.yml`.
+> Los repos de proyecto deben tener dos pares de secrets de deploy: `DEV_DEPLOY_WEBHOOK_URL` / `DEV_DEPLOY_TOKEN` para el deploy automático a `dev` (push a `develop`), y `DEPLOY_WEBHOOK_URL` / `DEPLOY_TOKEN` para los deploys a `staging` y `production`, tanto automático (push a `hotfix/**` en `publish-and-deploy.yml`) como manual (`make-release.yml`).
 
 ---
 
@@ -484,7 +484,7 @@ flowchart TD
     subgraph auto["publish-and-deploy.yml — automático"]
         direction LR
         p1["push: develop"] --> p2["lint-build\npublish snapshot"]
-        p3["push: hotfix/*"] --> p4["lint-build\npublish snapshot"]
+        p3["push: hotfix/**"] --> p4["lint-build\npublish snapshot"]
         p2 --> dev[/"env: dev"/]
         p4 --> stg1[/"env: staging"/]
     end
@@ -532,7 +532,7 @@ sequenceDiagram
     GHA->>NX: publish snapshot JAR/WAR
     GHA->>JNK: POST webhook — env: dev
 
-    Note over GHA,JNK: push → hotfix/*
+    Note over GHA,JNK: push → hotfix/**
     GHA->>NX: publish snapshot JAR/WAR
     GHA->>JNK: POST webhook — env: staging
 
