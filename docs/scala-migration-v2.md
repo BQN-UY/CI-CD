@@ -191,7 +191,7 @@ jobs:
       - uses: BQN-UY/CI-CD/.github/actions/shared/security-scan@v2
 ```
 
-### `publish-snapshot.yml`
+### `publish-and-deploy.yml`
 
 ```yaml
 name: Publish snapshot
@@ -202,7 +202,7 @@ on:
 
 jobs:
   publish:
-    name: Publish JAR snapshot → Nexus
+    name: Publish JAR snapshot → Nexus + deploy dev
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -218,6 +218,22 @@ jobs:
           NEXUS_USER:     ${{ secrets.NEXUS_USER }}
           NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
           NEXUS_URL:      ${{ secrets.NEXUS_URL }}
+
+      - name: Deploy to testing
+        if: github.ref == 'refs/heads/develop'
+        uses: BQN-UY/CI-CD/.github/actions/shared/deploy-trigger@v2
+        with:
+          environment: dev
+          service-url: ${{ secrets.DEV_DEPLOY_WEBHOOK_URL }}
+          token:       ${{ secrets.DEV_DEPLOY_TOKEN }}
+
+      - name: Deploy to staging
+        if: startsWith(github.ref, 'refs/heads/hotfix/')
+        uses: BQN-UY/CI-CD/.github/actions/shared/deploy-trigger@v2
+        with:
+          environment: staging
+          service-url: ${{ secrets.DEPLOY_WEBHOOK_URL }}
+          token:       ${{ secrets.DEPLOY_TOKEN }}
 ```
 
 ### `start-release.yml`
@@ -388,8 +404,10 @@ Confirmar con DevOps que los siguientes secrets están configurados en el repo:
 | `NEXUS_USER` | Usuario de Nexus |
 | `NEXUS_PASSWORD` | Contraseña de Nexus |
 | `NEXUS_URL` | URL base del repositorio Nexus |
-| `DEPLOY_WEBHOOK_URL` | Endpoint del webhook de deploy |
-| `DEPLOY_TOKEN` | Token de autenticación del webhook |
+| `DEPLOY_WEBHOOK_URL` | Endpoint del webhook de deploy (staging / production) |
+| `DEPLOY_TOKEN` | Token de autenticación del webhook (staging / production) |
+| `DEV_DEPLOY_WEBHOOK_URL` | Endpoint del webhook de deploy para el ambiente de testing |
+| `DEV_DEPLOY_TOKEN` | Token de autenticación del webhook de testing |
 
 Los secrets `DEPLOY_KEY`, `DEPLOY_IP`, `DEPLOY_PORT`, `DEPLOY_USER`, `JENKINS_USER`,
 `JENKINS_TOKEN` y `PUBLISHER_PATH` usados en v1 **dejan de ser necesarios** en v2.
@@ -421,11 +439,11 @@ actualizar esa referencia para que use la convención de sbt-dynver antes de mig
 [ ] version.sbt eliminado (git rm)
 [ ] sbt version muestra la versión correcta localmente
 [ ] ci.yml actualizado a v2
-[ ] publish-snapshot.yml actualizado a v2
+[ ] publish-and-deploy.yml actualizado a v2
 [ ] start-release.yml creado
 [ ] make-release.yml actualizado a v2
 [ ] start-hotfix.yml actualizado a v2
-[ ] Secrets de deploy configurados por DevOps
+[ ] Secrets de deploy configurados por DevOps (DEPLOY_WEBHOOK_URL, DEPLOY_TOKEN, DEV_DEPLOY_WEBHOOK_URL, DEV_DEPLOY_TOKEN)
 [ ] PR abierto con label feature hacia develop
 [ ] CI pasa en la feature branch
 ```

@@ -21,6 +21,24 @@ disparar cada workflow.
 | **Seguridad por defecto** | OpenGrep y BetterLeaks corren en cada PR sin configuración adicional. |
 | **SemVer 2.0 estricto** | La versión vive en el tag de Git. No hay archivos de versión que colisionen en back-merge. |
 
+### Branching model
+
+```mermaid
+flowchart LR
+    feat["feature/*"]
+    develop(("develop"))
+    release["release/vX.Y.Z"]
+    hotfix["hotfix/vX.Y.Z-desc"]
+    main(("main"))
+
+    feat -->|"PR → merge"| develop
+    develop -->|"start-release\n(manual)"| release
+    release -->|"make-release\n(manual)"| main
+    main -.->|"back-merge\n(automático)"| develop
+    main -->|"start-hotfix\n(manual)"| hotfix
+    hotfix -->|"make-release\n(manual)"| main
+```
+
 ---
 
 ## 2. Estructura del repositorio CI-CD
@@ -255,6 +273,8 @@ secrets en cada repo del proyecto. Falla si el webhook devuelve un status distin
 | `service-url` | URL del webhook de deploy |
 | `token` | Token de autenticación |
 
+> Los repos de proyecto deben tener dos pares de secrets de deploy: `DEV_DEPLOY_WEBHOOK_URL` / `DEV_DEPLOY_TOKEN` para el deploy automático desde `publish-and-deploy.yml`, y `DEPLOY_WEBHOOK_URL` / `DEPLOY_TOKEN` para el deploy manual desde `make-release.yml`.
+
 ---
 
 ## 4. Caso 1 — Backend: Scala / Pekko REST API
@@ -315,13 +335,17 @@ Jobs:
   security      → shared/security-scan
 ```
 
-#### `publish-snapshot.yml` — publica snapshot a Nexus
+#### `publish-and-deploy.yml` — publica snapshot a Nexus y despliega automáticamente
 
 ```
 Trigger: push → develop  |  push → hotfix/**
 
 La versión la calcula sbt-dynver automáticamente (formato: 1.2.0+3-abc1234).
-Publica con: sbt publish
+Pasos:
+  1. backend/scala/lint-build
+  2. sbt publish                → publica JAR snapshot en Nexus
+  3. shared/deploy-trigger      → deploy a dev     (solo si rama == develop)
+                                → deploy a staging (solo si rama == hotfix/**)
 ```
 
 #### `start-release.yml` — crea la release branch
@@ -400,9 +424,10 @@ Pasos: Setup Python → `pip install` → `ruff check` → `ruff format --check`
 Jobs: verify-label + lint-build (html-js) + security
 ```
 
-#### `publish-snapshot.yml`
+#### `publish-and-deploy.yml`
 El snapshot del frontend es el artefacto `/dist` guardado en GitHub Actions Artifacts
 (no en Nexus). Si hay CDN o storage propio, se agrega un paso de upload.
+Después del upload, se dispara `shared/deploy-trigger`: `environment: dev` si la rama es `develop`, `environment: staging` si la rama es `hotfix/**`.
 
 #### `make-release.yml`
 ```
@@ -425,13 +450,15 @@ Pasos:
 Jobs: verify-label + lint-test (python) + security
 ```
 
-#### `publish-snapshot.yml`
+#### `publish-and-deploy.yml`
 El snapshot de Python es una **imagen Docker** publicada en GHCR (GitHub Container
 Registry), equivalente a los maven-snapshots del stack Scala.
 
 ```
 Tag de imagen: ghcr.io/bqn-uy/{repo}:{github.sha}
 ```
+
+Después de publicar la imagen, se dispara `shared/deploy-trigger`: `environment: dev` si la rama es `develop`, `environment: staging` si la rama es `hotfix/**`.
 
 #### `make-release.yml`
 ```
@@ -449,6 +476,25 @@ Pasos:
 ---
 
 ## 6. Resumen comparativo de stacks
+
+### Actions y environments
+
+```mermaid
+flowchart TD
+    subgraph auto["publish-and-deploy.yml — automático"]
+        direction LR
+        p1["push: develop"] --> p2["lint-build\npublish snapshot"]
+        p3["push: hotfix/*"] --> p4["lint-build\npublish snapshot"]
+        p2 --> dev[/"env: dev"/]
+        p4 --> stg1[/"env: staging"/]
+    end
+
+    subgraph manual["make-release.yml — manual (workflow_dispatch)"]
+        direction LR
+        m1["release/vX.Y.Z"] --> m2["lint-build\nsecurity-scan\nsemver-tag\npublish release\ngithub-release\ngit-merge ×2"]
+        m2 --> stg2[/"env: staging\nenv: production"/]
+    end
+```
 
 ### Action de stack por tipo de repo
 
@@ -470,6 +516,31 @@ Pasos:
 | HTML+JS | Artefacto `/dist` en Actions Artifacts | Artefacto `/dist` adjunto en GitHub Release |
 | Vaadin | WAR/JAR en Nexus maven-snapshots | WAR/JAR en Nexus maven-releases + GitHub Release |
 | Flutter | APK/IPA en Actions Artifacts | APK/IPA adjunto en GitHub Release |
+
+### Interacciones con servicios externos
+
+> Aplica a stacks que usan Nexus (Scala/Pekko, Vaadin). Python publica en GHCR (GitHub); HTML+JS y Flutter en Actions Artifacts — ninguno de los dos interactúa con Nexus ni Jenkins directamente.
+
+```mermaid
+sequenceDiagram
+    actor DEV as Developer
+    participant GHA as GitHub Actions
+    participant NX as Nexus
+    participant JNK as Jenkins
+
+    Note over GHA,JNK: push → develop (merge de feature/*)
+    GHA->>NX: publish snapshot JAR/WAR
+    GHA->>JNK: POST webhook — env: dev
+
+    Note over GHA,JNK: push → hotfix/*
+    GHA->>NX: publish snapshot JAR/WAR
+    GHA->>JNK: POST webhook — env: staging
+
+    Note over DEV,JNK: make-release.yml (workflow_dispatch)
+    DEV->>GHA: trigger manual (bump + environment)
+    GHA->>NX: publish release JAR/WAR
+    GHA->>JNK: POST webhook — env: staging | production
+```
 
 ### Conventional Commits y labels de PR
 
