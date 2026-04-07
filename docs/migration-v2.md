@@ -269,11 +269,11 @@ secrets en cada repo del proyecto. Falla si el webhook devuelve un status distin
 
 | Input | Descripción |
 |---|---|
-| `environment` | `dev` \| `staging` \| `production` |
+| `environment` | `testing` \| `staging` \| `production` |
 | `service-url` | URL del webhook de deploy |
 | `token` | Token de autenticación |
 
-> Los repos de proyecto deben tener dos pares de secrets de deploy: `DEV_DEPLOY_WEBHOOK_URL` / `DEV_DEPLOY_TOKEN` para el deploy automático a `dev` (push a `develop`), y `DEPLOY_WEBHOOK_URL` / `DEPLOY_TOKEN` para los deploys a `staging` y `production`, tanto automático (push a `hotfix/**` en `publish-and-deploy.yml`) como manual (`make-release.yml`).
+> Los repos de proyecto deben tener dos pares de secrets de deploy: `TESTING_DEPLOY_WEBHOOK_URL` / `TESTING_DEPLOY_TOKEN` para el deploy automático a `testing` (push a `develop`), y `DEPLOY_WEBHOOK_URL` / `DEPLOY_TOKEN` para los deploys a `staging` y `production`, tanto automático (push a `hotfix/**` en `publish-and-deploy.yml`) como manual (`make-release.yml`).
 
 ---
 
@@ -344,7 +344,7 @@ La versión la calcula sbt-dynver automáticamente (formato: 1.2.0+3-abc1234).
 Pasos:
   1. backend/scala/lint-build
   2. sbt publish                → publica JAR snapshot en Nexus
-  3. shared/deploy-trigger      → deploy a dev     (solo si rama == develop)
+  3. shared/deploy-trigger      → deploy a testing (solo si rama == develop)
                                 → deploy a staging (solo si rama == hotfix/**)
 ```
 
@@ -427,7 +427,7 @@ Jobs: verify-label + lint-build (html-js) + security
 #### `publish-and-deploy.yml`
 El snapshot del frontend es el artefacto `/dist` guardado en GitHub Actions Artifacts
 (no en Nexus). Si hay CDN o storage propio, se agrega un paso de upload.
-Después del upload, se dispara `shared/deploy-trigger`: `environment: dev` si la rama es `develop`, `environment: staging` si la rama es `hotfix/**`.
+Después del upload, se dispara `shared/deploy-trigger`: `environment: testing` si la rama es `develop`, `environment: staging` si la rama es `hotfix/**`.
 
 #### `make-release.yml`
 ```
@@ -458,7 +458,7 @@ Registry), equivalente a los maven-snapshots del stack Scala.
 Tag de imagen: ghcr.io/bqn-uy/{repo}:{github.sha}
 ```
 
-Después de publicar la imagen, se dispara `shared/deploy-trigger`: `environment: dev` si la rama es `develop`, `environment: staging` si la rama es `hotfix/**`.
+Después de publicar la imagen, se dispara `shared/deploy-trigger`: `environment: testing` si la rama es `develop`, `environment: staging` si la rama es `hotfix/**`.
 
 #### `make-release.yml`
 ```
@@ -485,7 +485,7 @@ flowchart TD
         direction LR
         p1["push: develop"] --> p2["lint-build\npublish snapshot"]
         p3["push: hotfix/**"] --> p4["lint-build\npublish snapshot"]
-        p2 --> dev[/"env: dev"/]
+        p2 --> dev[/"env: testing"/]
         p4 --> stg1[/"env: staging"/]
     end
 
@@ -530,7 +530,7 @@ sequenceDiagram
 
     Note over GHA,JNK: push → develop (merge de feature/*)
     GHA->>NX: publish snapshot JAR/WAR
-    GHA->>JNK: POST webhook — env: dev
+    GHA->>JNK: POST webhook — env: testing
 
     Note over GHA,JNK: push → hotfix/**
     GHA->>NX: publish snapshot JAR/WAR

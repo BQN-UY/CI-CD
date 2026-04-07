@@ -219,13 +219,13 @@ jobs:
           NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
           NEXUS_URL:      ${{ secrets.NEXUS_URL }}
 
-      - name: Deploy to dev
+      - name: Deploy to testing
         if: github.ref == 'refs/heads/develop'
         uses: BQN-UY/CI-CD/.github/actions/shared/deploy-trigger@v2
         with:
-          environment: dev
-          service-url: ${{ secrets.DEV_DEPLOY_WEBHOOK_URL }}
-          token:       ${{ secrets.DEV_DEPLOY_TOKEN }}
+          environment: testing
+          service-url: ${{ secrets.TESTING_DEPLOY_WEBHOOK_URL }}
+          token:       ${{ secrets.TESTING_DEPLOY_TOKEN }}
 
       - name: Deploy to staging
         if: startsWith(github.ref, 'refs/heads/hotfix/')
@@ -406,8 +406,8 @@ Confirmar con DevOps que los siguientes secrets están configurados en el repo:
 | `NEXUS_URL` | URL base del repositorio Nexus |
 | `DEPLOY_WEBHOOK_URL` | Endpoint del webhook de deploy (staging / production) |
 | `DEPLOY_TOKEN` | Token de autenticación del webhook (staging / production) |
-| `DEV_DEPLOY_WEBHOOK_URL` | Endpoint del webhook de deploy para el ambiente de testing |
-| `DEV_DEPLOY_TOKEN` | Token de autenticación del webhook de testing |
+| `TESTING_DEPLOY_WEBHOOK_URL` | Endpoint del webhook de deploy para el ambiente de testing |
+| `TESTING_DEPLOY_TOKEN` | Token de autenticación del webhook de testing |
 
 Los secrets `DEPLOY_KEY`, `DEPLOY_IP`, `DEPLOY_PORT`, `DEPLOY_USER`, `JENKINS_USER`,
 `JENKINS_TOKEN` y `PUBLISHER_PATH` usados en v1 **dejan de ser necesarios** en v2.
@@ -443,7 +443,7 @@ actualizar esa referencia para que use la convención de sbt-dynver antes de mig
 [ ] start-release.yml creado
 [ ] make-release.yml actualizado a v2
 [ ] start-hotfix.yml actualizado a v2
-[ ] Secrets de deploy configurados por DevOps (DEPLOY_WEBHOOK_URL, DEPLOY_TOKEN, DEV_DEPLOY_WEBHOOK_URL, DEV_DEPLOY_TOKEN)
+[ ] Secrets de deploy configurados por DevOps (DEPLOY_WEBHOOK_URL, DEPLOY_TOKEN, TESTING_DEPLOY_WEBHOOK_URL, TESTING_DEPLOY_TOKEN)
 [ ] PR abierto con label feature hacia develop
 [ ] CI pasa en la feature branch
 ```

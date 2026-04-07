@@ -3,7 +3,7 @@ description: Dispara deploy vía webhook configurable por repo
 
 inputs:
   environment:
-    description: dev | staging | production
+    description: testing | staging | production
     required: true
   service-url:
     description: URL del webhook de deploy
@@ -19,9 +19,9 @@ runs:
       shell: bash
       run: |
         case "${{ inputs.environment }}" in
-          dev|staging|production) ;;
+          testing|staging|production) ;;
           *)
-            echo "Error: invalid environment '${{ inputs.environment }}'. Expected one of: dev, staging, production." >&2
+            echo "Error: invalid environment '${{ inputs.environment }}'. Expected one of: testing, staging, production." >&2
             exit 1
             ;;
         esac
