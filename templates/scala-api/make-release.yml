@@ -78,6 +78,6 @@ jobs:
           environment:  production
           service-url:  ${{ secrets.JENKINS_DEPLOY_URL }}
           token:        ${{ secrets.JENKINS_DEPLOY_PRODUCTION_TOKEN }}
-          sistema:      ${{ vars.SISTEMA }}
+          sistema:      ${{ vars.SISTEMA || github.event.repository.name }}
           version:      ${{ steps.version.outputs.tag }}
           installation: ${{ inputs.installation }}
