@@ -320,7 +320,7 @@ jobs:
     name: Tag + Nexus + GitHub Release + deploy production + back-merge
     runs-on: ubuntu-latest
     if: startsWith(github.ref_name, 'release/') || startsWith(github.ref_name, 'hotfix/')
-    environment: ${{ inputs.environment }}
+    environment: production
     permissions:
       contents: write          # requerido para crear tags y hacer push de ramas
       security-events: write   # requerido para subir SARIF al tab de Security
