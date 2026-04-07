@@ -660,7 +660,33 @@ N/A
 - [ ] PR tiene exactamente un label asignado
 ```
 
-### 8.2 `.github/labeler.yml`
+### 8.2 `CLAUDE.md` y `.github/copilot-instructions.md`
+
+Proveen contexto del proyecto a los asistentes de AI (Claude Code y GitHub Copilot
+respectivamente). Con estos archivos presentes, el AI comprende el branching model,
+la semántica de ambientes y las reglas del CI/CD sin necesidad de consultar la
+documentación de `BQN-UY/CI-CD`.
+
+Los templates listos para copiar están en `BQN-UY/CI-CD`:
+
+```
+templates/<stack>/CLAUDE.md
+templates/<stack>/.github/copilot-instructions.md
+```
+
+Ambos archivos cubren:
+- Branching model y para qué sirve cada rama
+- Tabla de ambientes (qué rama despliega a dónde y por qué)
+- Reglas críticas (ej. fixes de release nunca van a `develop`)
+- Workflows disponibles y sus triggers
+- Secrets requeridos y su patrón de nombres
+- Qué no hacer (guía de errores comunes)
+
+> Al incorporar un nuevo desarrollador o iniciar una sesión con un AI en el repo,
+> estos archivos garantizan que el asistente opere con el mismo modelo mental
+> que el equipo — sin alucinaciones sobre el flujo de trabajo.
+
+### 8.3 `.github/labeler.yml`
 
 Aplica labels automáticamente según el nombre de la rama fuente del PR.
 

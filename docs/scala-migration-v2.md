@@ -468,6 +468,8 @@ actualizar esa referencia para que use la convención de sbt-dynver antes de mig
 [ ] make-release.yml actualizado a v2
 [ ] start-hotfix.yml actualizado a v2
 [ ] Secrets de deploy configurados por DevOps (DEPLOY_TESTING_URL, DEPLOY_TESTING_TOKEN, DEPLOY_STAGING_URL, DEPLOY_STAGING_TOKEN, DEPLOY_PRODUCTION_URL, DEPLOY_PRODUCTION_TOKEN)
+[ ] CLAUDE.md copiado desde templates/scala-api/CLAUDE.md
+[ ] .github/copilot-instructions.md copiado desde templates/scala-api/.github/copilot-instructions.md
 [ ] PR abierto con label feature hacia develop
 [ ] CI pasa en la feature branch
 ```
