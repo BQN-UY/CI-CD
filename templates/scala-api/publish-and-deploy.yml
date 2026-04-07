@@ -24,7 +24,7 @@ jobs:
           NEXUS_URL:      ${{ secrets.NEXUS_URL }}
 
       - name: Deploy to testing
-        if: github.ref == 'refs/heads/develop'
+        if: github.ref == 'refs/heads/develop' || startsWith(github.ref, 'refs/heads/release/')
         uses: BQN-UY/CI-CD/.github/actions/shared/deploy-trigger@v2
         with:
           environment: testing
@@ -32,7 +32,7 @@ jobs:
           token:       ${{ secrets.DEPLOY_TESTING_TOKEN }}
 
       - name: Deploy to staging
-        if: startsWith(github.ref, 'refs/heads/hotfix/') || startsWith(github.ref, 'refs/heads/release/')
+        if: startsWith(github.ref, 'refs/heads/hotfix/')
         uses: BQN-UY/CI-CD/.github/actions/shared/deploy-trigger@v2
         with:
           environment: staging

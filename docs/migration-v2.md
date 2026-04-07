@@ -344,8 +344,8 @@ La versión la calcula sbt-dynver automáticamente (formato: 1.2.0+3-abc1234).
 Pasos:
   1. backend/scala/lint-build
   2. sbt publish                → publica JAR snapshot en Nexus
-  3. shared/deploy-trigger      → deploy a testing (solo si rama == develop)
-                                → deploy a staging (solo si rama == hotfix/** o release/**)
+  3. shared/deploy-trigger      → deploy a testing (rama == develop o release/**)
+                                → deploy a staging (rama == hotfix/**)
 ```
 
 #### `start-release.yml` — crea la release branch
@@ -390,9 +390,9 @@ re-publican en staging.
 **Si durante el testeo en staging se detecta un problema, el fix va a `release/vX.Y.Z` directamente — nunca a `develop`.**
 
 ```
-develop ──●──●──[start-release]──●──●──●──  ← próxima versión, solo va a testing
+develop ──●──●──[start-release]──●──●──●──  ← próxima versión → testing
                       │
-          release/vX.Y.Z ──[fix]──[fix]──   ← fixes del release actual → staging
+          release/vX.Y.Z ──[fix]──[fix]──   ← fixes del release actual → testing
                                     │
                               make-release → production
                                     │
@@ -403,8 +403,8 @@ El ciclo completo de un fix en release:
 
 ```
 1. Commit del fix directo en release/vX.Y.Z  (o PR hacia release/vX.Y.Z)
-2. push → publish-and-deploy.yml             → snapshot Nexus + deploy staging
-3. Validar en staging
+2. push → publish-and-deploy.yml             → snapshot Nexus + deploy testing
+3. Validar en testing
 4. Si OK → make-release.yml                  → tag + Nexus release + GitHub Release
                                              → merge release → main
                                              → back-merge main → develop
@@ -517,8 +517,8 @@ Pasos:
 flowchart TD
     subgraph auto["publish-and-deploy.yml — automático"]
         direction LR
-        p1["push: develop"] --> p2["lint-build\npublish snapshot"]
-        p3["push: hotfix/**\npush: release/**"] --> p4["lint-build\npublish snapshot"]
+        p1["push: develop\npush: release/**"] --> p2["lint-build\npublish snapshot"]
+        p3["push: hotfix/**"] --> p4["lint-build\npublish snapshot"]
         p2 --> dev[/"env: testing"/]
         p4 --> stg1[/"env: staging"/]
     end
@@ -566,14 +566,18 @@ sequenceDiagram
     GHA->>NX: publish snapshot JAR/WAR
     GHA->>JNK: POST webhook — env: testing
 
-    Note over GHA,JNK: push → hotfix/**
+    Note over GHA,JNK: push → release/** (fix durante el release)
+    GHA->>NX: publish snapshot JAR/WAR
+    GHA->>JNK: POST webhook — env: testing
+
+    Note over GHA,JNK: push → hotfix/** (fix urgente a producción)
     GHA->>NX: publish snapshot JAR/WAR
     GHA->>JNK: POST webhook — env: staging
 
     Note over DEV,JNK: make-release.yml (workflow_dispatch)
-    DEV->>GHA: trigger manual (bump + environment)
+    DEV->>GHA: trigger manual (bump)
     GHA->>NX: publish release JAR/WAR
-    GHA->>JNK: POST webhook — env: staging | production
+    GHA->>JNK: POST webhook — env: production
 ```
 
 ### Conventional Commits y labels de PR

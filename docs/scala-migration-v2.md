@@ -220,7 +220,7 @@ jobs:
           NEXUS_URL:      ${{ secrets.NEXUS_URL }}
 
       - name: Deploy to testing
-        if: github.ref == 'refs/heads/develop'
+        if: github.ref == 'refs/heads/develop' || startsWith(github.ref, 'refs/heads/release/')
         uses: BQN-UY/CI-CD/.github/actions/shared/deploy-trigger@v2
         with:
           environment: testing
@@ -228,7 +228,7 @@ jobs:
           token:       ${{ secrets.DEPLOY_TESTING_TOKEN }}
 
       - name: Deploy to staging
-        if: startsWith(github.ref, 'refs/heads/hotfix/') || startsWith(github.ref, 'refs/heads/release/')
+        if: startsWith(github.ref, 'refs/heads/hotfix/')
         uses: BQN-UY/CI-CD/.github/actions/shared/deploy-trigger@v2
         with:
           environment: staging
@@ -250,7 +250,7 @@ curso ni re-publican en staging.
 directamente sobre `release/vX.Y.Z` — nunca sobre `develop`.**
 
 El push a `release/vX.Y.Z` dispara `publish-and-deploy.yml` automáticamente:
-publica el snapshot en Nexus y redespliega staging. Una vez validado,
+publica el snapshot en Nexus y redespliega testing. Una vez validado,
 `make-release.yml` cierra el ciclo: crea el tag, publica en Nexus releases,
 mergea a main y hace back-merge a develop (así los fixes vuelven a develop al final).
 
