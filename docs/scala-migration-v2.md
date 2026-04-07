@@ -202,7 +202,7 @@ on:
 
 jobs:
   publish:
-    name: Publish JAR snapshot → Nexus + deploy dev/staging
+    name: Publish JAR snapshot → Nexus + deploy testing/staging
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
