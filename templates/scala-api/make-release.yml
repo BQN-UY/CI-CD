@@ -71,5 +71,5 @@ jobs:
         uses: BQN-UY/CI-CD/.github/actions/shared/deploy-trigger@v2
         with:
           environment: production
-          service-url: ${{ secrets.JENKINS_DEPLOY_PRODUCTION_URL }}
+          service-url: ${{ secrets.JENKINS_DEPLOY_URL }}
           token:       ${{ secrets.JENKINS_DEPLOY_PRODUCTION_TOKEN }}

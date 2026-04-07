@@ -49,9 +49,10 @@ Este proyecto usa CI/CD v2 de BQN-UY. Las actions reutilizables viven en
 | Secret | Uso |
 |---|---|
 | `NEXUS_USER` / `NEXUS_PASSWORD` / `NEXUS_URL` | Publicar JAR en Nexus |
-| `JENKINS_DEPLOY_TESTING_URL` / `JENKINS_DEPLOY_TESTING_TOKEN` | Deploy a testing |
-| `JENKINS_DEPLOY_STAGING_URL` / `JENKINS_DEPLOY_STAGING_TOKEN` | Deploy a staging |
-| `JENKINS_DEPLOY_PRODUCTION_URL` / `JENKINS_DEPLOY_PRODUCTION_TOKEN` | Deploy a production |
+| `JENKINS_DEPLOY_URL` | Endpoint webhook (compartido por todos los ambientes) |
+| `JENKINS_DEPLOY_TESTING_TOKEN` | Token de autenticación — deploy a testing |
+| `JENKINS_DEPLOY_STAGING_TOKEN` | Token de autenticación — deploy a staging |
+| `JENKINS_DEPLOY_PRODUCTION_TOKEN` | Token de autenticación — deploy a production |
 
 ## Qué NO hacer
 

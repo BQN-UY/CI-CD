@@ -224,7 +224,7 @@ jobs:
         uses: BQN-UY/CI-CD/.github/actions/shared/deploy-trigger@v2
         with:
           environment: testing
-          service-url: ${{ secrets.JENKINS_DEPLOY_TESTING_URL }}
+          service-url: ${{ secrets.JENKINS_DEPLOY_URL }}
           token:       ${{ secrets.JENKINS_DEPLOY_TESTING_TOKEN }}
 
       - name: Deploy to staging
@@ -232,7 +232,7 @@ jobs:
         uses: BQN-UY/CI-CD/.github/actions/shared/deploy-trigger@v2
         with:
           environment: staging
-          service-url: ${{ secrets.JENKINS_DEPLOY_STAGING_URL }}
+          service-url: ${{ secrets.JENKINS_DEPLOY_URL }}
           token:       ${{ secrets.JENKINS_DEPLOY_STAGING_TOKEN }}
 ```
 
@@ -377,7 +377,7 @@ jobs:
         uses: BQN-UY/CI-CD/.github/actions/shared/deploy-trigger@v2
         with:
           environment: production
-          service-url: ${{ secrets.JENKINS_DEPLOY_PRODUCTION_URL }}
+          service-url: ${{ secrets.JENKINS_DEPLOY_URL }}
           token:       ${{ secrets.JENKINS_DEPLOY_PRODUCTION_TOKEN }}
 ```
 
@@ -431,11 +431,9 @@ Confirmar con DevOps que los siguientes secrets están configurados en el repo:
 | `NEXUS_USER` | Usuario de Nexus |
 | `NEXUS_PASSWORD` | Contraseña de Nexus |
 | `NEXUS_URL` | URL base del repositorio Nexus |
-| `JENKINS_DEPLOY_TESTING_URL` | Endpoint del webhook de deploy — ambiente testing |
+| `JENKINS_DEPLOY_URL` | Endpoint del webhook de deploy (compartido por todos los ambientes) |
 | `JENKINS_DEPLOY_TESTING_TOKEN` | Token de autenticación — ambiente testing |
-| `JENKINS_DEPLOY_STAGING_URL` | Endpoint del webhook de deploy — ambiente staging |
 | `JENKINS_DEPLOY_STAGING_TOKEN` | Token de autenticación — ambiente staging |
-| `JENKINS_DEPLOY_PRODUCTION_URL` | Endpoint del webhook de deploy — ambiente production |
 | `JENKINS_DEPLOY_PRODUCTION_TOKEN` | Token de autenticación — ambiente production |
 
 Los secrets `DEPLOY_KEY`, `DEPLOY_IP`, `DEPLOY_PORT`, `DEPLOY_USER`, `JENKINS_USER`,
@@ -472,7 +470,7 @@ actualizar esa referencia para que use la convención de sbt-dynver antes de mig
 [ ] start-release.yml creado
 [ ] make-release.yml actualizado a v2
 [ ] start-hotfix.yml actualizado a v2
-[ ] Secrets de deploy configurados por DevOps (JENKINS_DEPLOY_TESTING_URL, JENKINS_DEPLOY_TESTING_TOKEN, JENKINS_DEPLOY_STAGING_URL, JENKINS_DEPLOY_STAGING_TOKEN, JENKINS_DEPLOY_PRODUCTION_URL, JENKINS_DEPLOY_PRODUCTION_TOKEN)
+[ ] Secrets de deploy configurados por DevOps (JENKINS_DEPLOY_URL, JENKINS_DEPLOY_TESTING_TOKEN, JENKINS_DEPLOY_STAGING_TOKEN, JENKINS_DEPLOY_PRODUCTION_TOKEN)
 [ ] CLAUDE.md copiado desde templates/scala-api/CLAUDE.md
 [ ] .github/copilot-instructions.md copiado desde templates/scala-api/.github/copilot-instructions.md
 [ ] PR abierto con label feature hacia develop
