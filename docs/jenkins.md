@@ -189,6 +189,84 @@ Cada job recibe el payload JSON via GWT y tiene `ENVIRONMENT` hardcodeado
 
 ---
 
+## Prerequisitos en Jenkins
+
+Además de los jobs, se requiere tener configurado:
+
+| Item | Descripción |
+|---|---|
+| Plugin **Generic Webhook Trigger** | Instalado en la instancia Jenkins |
+| Credencial `nexus_deploy` | Usuario/password para descargar artefactos desde Nexus |
+| Credencial `github_pat_jenkins` | PAT GitHub read-only (`contents`) para leer `config/sistemas.json` |
+| `config/sistemas.json` | Archivo en el repo Jenkins con la lista de sistemas y sus instalaciones por ambiente. Los Active Choice dropdowns lo leen via GitHub API. |
+
+### `config/sistemas.json`
+
+Define qué sistemas existen y qué instalaciones tiene cada uno en cada ambiente.
+Los jobs Jenkins usan este archivo para validar el `SISTEMA` recibido en el webhook
+y para poblar los dropdowns de ejecución manual.
+
+```json
+{
+  "apps": [
+    {
+      "name": "payments-api",
+      "environments": [
+        {
+          "name": "testing",
+          "installations": [{ "name": "install-1" }]
+        },
+        {
+          "name": "staging",
+          "installations": [{ "name": "install-1" }]
+        },
+        {
+          "name": "production",
+          "auto_deploy": true,
+          "installations": [
+            { "name": "install-1" },
+            { "name": "install-2" }
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
+
+> Agregar o dar de baja un sistema es un PR sobre `config/sistemas.json` —
+> no requiere cambios en los jobs Jenkins.
+
+---
+
+## Advertencia: `+` en versiones sbt-dynver y URLs de Nexus
+
+Las versiones snapshot generadas por sbt-dynver contienen `+` como separador
+(ej. `1.2.0+3-abc1234`). El carácter `+` está **reservado en URLs** (equivale a
+espacio en query strings) y puede causar que el path de descarga desde Nexus sea
+inválido si se construye con concatenación directa.
+
+**Verificar antes de implementar el fetch en Jenkins:**
+
+```bash
+# ¿Nexus acepta el + literal en el path del artefacto?
+curl -u $NEXUS_CREDS \
+  "https://nexus.bqn.uy/repository/maven-snapshots/com/bqn/payments-api/1.2.0+3-abc1234/payments-api-1.2.0+3-abc1234.jar"
+```
+
+Si Nexus no acepta el `+` en el path, usar la **Nexus Search API** para resolver
+la URL exacta del artefacto a partir del `sistema` y la versión:
+
+```bash
+curl -u $NEXUS_CREDS \
+  "https://nexus.bqn.uy/service/rest/v1/search/assets?repository=maven-snapshots&name=payments-api&version=1.2.0%2B3-abc1234"
+```
+
+> ⚠️ Esta verificación es un prerequisito antes de implementar el stage
+> `FETCH` en `deploy-nexus.groovy`.
+
+---
+
 ## Resumen del flujo de seguridad
 
 ```
