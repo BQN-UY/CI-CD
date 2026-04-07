@@ -19,6 +19,10 @@ inputs:
     description: Versión del artefacto a desplegar (ej. 1.5.0 o 1.5.0+3-abc1234)
     required: false
     default: ""
+  installation:
+    description: Instalaciones destino (coma-separado, ej. install-1,install-2). Vacío = auto_deploy en todas.
+    required: false
+    default: ""
   issue-number:
     description: Número de issue o ticket asociado al deploy (opcional)
     required: false
@@ -35,6 +39,7 @@ runs:
         TOKEN:        ${{ inputs.token }}
         SISTEMA:      ${{ inputs.sistema }}
         VERSION:      ${{ inputs.version }}
+        INSTALLATION: ${{ inputs.installation }}
         ISSUE_NUMBER: ${{ inputs.issue-number }}
         GH_SHA:       ${{ github.sha }}
         GH_ACTOR:     ${{ github.actor }}
@@ -62,9 +67,11 @@ runs:
           --arg actor        "$GH_ACTOR" \
           --arg sistema      "$SISTEMA" \
           --arg version      "$VERSION" \
+          --arg installation "$INSTALLATION" \
           --arg issue_number "$ISSUE_NUMBER" \
           '{environment: $environment, ref: $ref, actor: $actor,
-            sistema: $sistema, version: $version, issue_number: $issue_number}')
+            sistema: $sistema, version: $version,
+            installation: $installation, issue_number: $issue_number}')
 
         # URL-encode el token para evitar que caracteres reservados (+, &, %)
         # corrompan la query string.

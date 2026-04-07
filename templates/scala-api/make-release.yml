@@ -2,6 +2,11 @@ name: Make release
 
 on:
   workflow_dispatch:
+    inputs:
+      installation:
+        description: "Instalaciones destino (coma-separado, ej. install-1,install-2). Vacío = todas."
+        required: false
+        default: ""
 
 jobs:
   release:
@@ -70,8 +75,9 @@ jobs:
       - name: Deploy to production
         uses: BQN-UY/CI-CD/.github/actions/shared/jenkins-deploy-trigger@v2
         with:
-          environment: production
-          service-url: ${{ secrets.JENKINS_DEPLOY_URL }}
-          token:       ${{ secrets.JENKINS_DEPLOY_PRODUCTION_TOKEN }}
-          sistema:     ${{ vars.SISTEMA }}
-          version:     ${{ steps.version.outputs.tag }}
+          environment:  production
+          service-url:  ${{ secrets.JENKINS_DEPLOY_URL }}
+          token:        ${{ secrets.JENKINS_DEPLOY_PRODUCTION_TOKEN }}
+          sistema:      ${{ vars.SISTEMA }}
+          version:      ${{ steps.version.outputs.tag }}
+          installation: ${{ inputs.installation }}

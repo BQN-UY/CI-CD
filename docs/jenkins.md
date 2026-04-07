@@ -99,6 +99,7 @@ El token es la única fuente de verdad del destino.
 | `token` | ✅ | Token GWT — va como `?token=` en la URL |
 | `sistema` | — | Nombre del sistema a desplegar |
 | `version` | — | Versión del artefacto (dynver snapshot o tag release) |
+| `installation` | — | Instalaciones destino (coma-separado). Vacío = `auto_deploy` en todas. Solo relevante en deploys manuales a production. |
 | `issue-number` | — | Número de issue/ticket asociado |
 
 ---
@@ -146,11 +147,12 @@ El token es la única fuente de verdad del destino.
 - name: Deploy to production
   uses: BQN-UY/CI-CD/.github/actions/shared/jenkins-deploy-trigger@v2
   with:
-    environment: production
-    service-url: ${{ secrets.JENKINS_DEPLOY_URL }}
-    token:       ${{ secrets.JENKINS_DEPLOY_PRODUCTION_TOKEN }}
-    sistema:     ${{ vars.SISTEMA }}
-    version:     ${{ steps.version.outputs.tag }}
+    environment:  production
+    service-url:  ${{ secrets.JENKINS_DEPLOY_URL }}
+    token:        ${{ secrets.JENKINS_DEPLOY_PRODUCTION_TOKEN }}
+    sistema:      ${{ vars.SISTEMA }}
+    version:      ${{ steps.version.outputs.tag }}
+    installation: ${{ inputs.installation }}   # vacío = auto_deploy
 ```
 
 ---
