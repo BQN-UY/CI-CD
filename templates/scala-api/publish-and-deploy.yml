@@ -1,0 +1,40 @@
+name: Publish and deploy
+
+on:
+  push:
+    branches: [develop, "hotfix/**"]
+
+jobs:
+  publish:
+    name: Publish JAR snapshot → Nexus + deploy testing/staging
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # sbt-dynver necesita historial Git completo
+
+      - uses: BQN-UY/CI-CD/.github/actions/backend/scala/lint-build@v2
+
+      - name: Publish snapshot to Nexus
+        shell: bash
+        run: sbt publish
+        env:
+          NEXUS_USER:     ${{ secrets.NEXUS_USER }}
+          NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
+          NEXUS_URL:      ${{ secrets.NEXUS_URL }}
+
+      - name: Deploy to testing
+        if: github.ref == 'refs/heads/develop'
+        uses: BQN-UY/CI-CD/.github/actions/shared/deploy-trigger@v2
+        with:
+          environment: testing
+          service-url: ${{ secrets.DEPLOY_TESTING_URL }}
+          token:       ${{ secrets.DEPLOY_TESTING_TOKEN }}
+
+      - name: Deploy to staging
+        if: startsWith(github.ref, 'refs/heads/hotfix/')
+        uses: BQN-UY/CI-CD/.github/actions/shared/deploy-trigger@v2
+        with:
+          environment: staging
+          service-url: ${{ secrets.DEPLOY_STAGING_URL }}
+          token:       ${{ secrets.DEPLOY_STAGING_TOKEN }}

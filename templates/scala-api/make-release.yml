@@ -1,0 +1,82 @@
+name: Make release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Tipo de bump
+        required: true
+        default: minor
+        type: choice
+        options: [major, minor, patch]
+      environment:
+        description: Entorno de deploy
+        required: true
+        default: production
+        type: choice
+        options: [staging, production]
+
+jobs:
+  release:
+    name: Tag + Nexus + GitHub Release + deploy + back-merge
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    permissions:
+      contents: write             # requerido para crear tags y hacer push de ramas
+      security-events: write      # requerido para subir SARIF al tab de Security
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: BQN-UY/CI-CD/.github/actions/backend/scala/lint-build@v2
+
+      - uses: BQN-UY/CI-CD/.github/actions/shared/security-scan@v2
+
+      - name: Crear tag SemVer
+        id: tag
+        uses: BQN-UY/CI-CD/.github/actions/shared/semver-tag@v2
+        with:
+          bump: ${{ inputs.bump }}
+
+      - name: Publish release JAR → Nexus
+        shell: bash
+        run: sbt publish
+        env:
+          NEXUS_USER:     ${{ secrets.NEXUS_USER }}
+          NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
+          NEXUS_URL:      ${{ secrets.NEXUS_URL }}
+
+      - uses: BQN-UY/CI-CD/.github/actions/shared/github-release@v2
+        with:
+          tag: ${{ steps.tag.outputs.tag }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Merge release → main
+        uses: BQN-UY/CI-CD/.github/actions/shared/git-merge@v2
+        with:
+          source: ${{ github.ref_name }}
+          target: main
+
+      - name: Back-merge main → develop
+        uses: BQN-UY/CI-CD/.github/actions/shared/git-merge@v2
+        with:
+          source: main
+          target: develop
+
+      - name: Deploy to staging
+        if: inputs.environment == 'staging'
+        uses: BQN-UY/CI-CD/.github/actions/shared/deploy-trigger@v2
+        with:
+          environment: staging
+          service-url: ${{ secrets.DEPLOY_STAGING_URL }}
+          token:       ${{ secrets.DEPLOY_STAGING_TOKEN }}
+
+      - name: Deploy to production
+        if: inputs.environment == 'production'
+        uses: BQN-UY/CI-CD/.github/actions/shared/deploy-trigger@v2
+        with:
+          environment: production
+          service-url: ${{ secrets.DEPLOY_PRODUCTION_URL }}
+          token:       ${{ secrets.DEPLOY_PRODUCTION_TOKEN }}

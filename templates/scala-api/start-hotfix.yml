@@ -1,0 +1,36 @@
+name: Start hotfix
+
+on:
+  workflow_dispatch:
+    inputs:
+      description:
+        description: Descripción corta del bug (ej. fix-null-parser)
+        required: true
+
+jobs:
+  start-hotfix:
+    name: Crear hotfix branch desde main
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write             # requerido para crear y pushear la rama
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - name: Calcular versión patch
+        id: semver
+        uses: BQN-UY/CI-CD/.github/actions/shared/semver-tag@v2
+        with:
+          bump: patch
+          dry-run: "true"
+
+      - name: Crear hotfix branch
+        shell: bash
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          BRANCH="hotfix/${{ steps.semver.outputs.tag }}-${{ inputs.description }}"
+          git checkout -b "$BRANCH"
+          git push origin "$BRANCH"
