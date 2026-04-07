@@ -54,6 +54,11 @@ runs:
             echo "Error: invalid tag '$TAG_INPUT'. Only letters, digits, '.', '_' and '-' are allowed." >&2
             exit 1
           fi
+          # Validate that the tag starts with the expected prefix (if prefix is set)
+          if [ -n "$PREFIX" ] && [[ "$TAG_INPUT" != "$PREFIX"* ]]; then
+            echo "Error: tag '$TAG_INPUT' must start with prefix '$PREFIX'." >&2
+            exit 1
+          fi
           VERSION="${TAG_INPUT#"$PREFIX"}"
           if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "Error: tag '$TAG_INPUT' does not contain a valid SemVer version (X.Y.Z) after prefix '$PREFIX'." >&2

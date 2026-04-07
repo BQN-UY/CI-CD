@@ -61,14 +61,17 @@ runs:
           '{environment: $environment, ref: $ref, actor: $actor,
             sistema: $sistema, version: $version, issue_number: $issue_number}')
 
-        # No usar --retry-all-errors en POST para evitar múltiples deploys
-        # ante timeouts o errores 5xx en webhooks no idempotentes.
+        # URL-encode el token para evitar que caracteres reservados (+, &, %)
+        # corrompan la query string.
+        TOKEN_ENC=$(jq -rn --arg t "$TOKEN" '$t | @uri')
+
+        # Sin --retry: POST sobre un webhook no idempotente — un retry ante timeout
+        # dispararía múltiples deploys si Jenkins ya procesó la request.
         RESPONSE_BODY=$(mktemp)
         HTTP_STATUS=$(curl -s -w "%{http_code}" -o "$RESPONSE_BODY" \
           --connect-timeout 10 \
           --max-time 30 \
-          --retry 3 \
-          -X POST "${SERVICE_URL}?token=${TOKEN}" \
+          -X POST "${SERVICE_URL}?token=${TOKEN_ENC}" \
           -H "Content-Type: application/json" \
           -d "$PAYLOAD")
 
