@@ -273,7 +273,7 @@ secrets en cada repo del proyecto. Falla si el webhook devuelve un status distin
 | `service-url` | URL del webhook de deploy |
 | `token` | Token de autenticación |
 
-> Los repos de proyecto deben tener tres pares de secrets, uno por ambiente: `DEPLOY_TESTING_URL` / `DEPLOY_TESTING_TOKEN`, `DEPLOY_STAGING_URL` / `DEPLOY_STAGING_TOKEN` y `DEPLOY_PRODUCTION_URL` / `DEPLOY_PRODUCTION_TOKEN`. Esto garantiza aislamiento total de credenciales — `publish-and-deploy.yml` (automático) nunca tiene acceso a los secrets de production.
+> Los repos de proyecto deben tener tres pares de secrets, uno por ambiente: `JENKINS_DEPLOY_TESTING_URL` / `JENKINS_DEPLOY_TESTING_TOKEN`, `JENKINS_DEPLOY_STAGING_URL` / `JENKINS_DEPLOY_STAGING_TOKEN` y `JENKINS_DEPLOY_PRODUCTION_URL` / `JENKINS_DEPLOY_PRODUCTION_TOKEN`. Esto garantiza aislamiento total de credenciales — `publish-and-deploy.yml` (automático) nunca tiene acceso a los secrets de production.
 
 ---
 

@@ -49,9 +49,9 @@ Este proyecto usa CI/CD v2 de BQN-UY. Las actions reutilizables viven en
 | Secret | Uso |
 |---|---|
 | `NEXUS_USER` / `NEXUS_PASSWORD` / `NEXUS_URL` | Publicar JAR en Nexus |
-| `DEPLOY_TESTING_URL` / `DEPLOY_TESTING_TOKEN` | Deploy a testing |
-| `DEPLOY_STAGING_URL` / `DEPLOY_STAGING_TOKEN` | Deploy a staging |
-| `DEPLOY_PRODUCTION_URL` / `DEPLOY_PRODUCTION_TOKEN` | Deploy a production |
+| `JENKINS_DEPLOY_TESTING_URL` / `JENKINS_DEPLOY_TESTING_TOKEN` | Deploy a testing |
+| `JENKINS_DEPLOY_STAGING_URL` / `JENKINS_DEPLOY_STAGING_TOKEN` | Deploy a staging |
+| `JENKINS_DEPLOY_PRODUCTION_URL` / `JENKINS_DEPLOY_PRODUCTION_TOKEN` | Deploy a production |
 
 ## Qué NO hacer
 

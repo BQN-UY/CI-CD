@@ -29,13 +29,13 @@ jobs:
         uses: BQN-UY/CI-CD/.github/actions/shared/deploy-trigger@v2
         with:
           environment: testing
-          service-url: ${{ secrets.DEPLOY_TESTING_URL }}
-          token:       ${{ secrets.DEPLOY_TESTING_TOKEN }}
+          service-url: ${{ secrets.JENKINS_DEPLOY_TESTING_URL }}
+          token:       ${{ secrets.JENKINS_DEPLOY_TESTING_TOKEN }}
 
       - name: Deploy to staging
         if: startsWith(github.ref, 'refs/heads/hotfix/')
         uses: BQN-UY/CI-CD/.github/actions/shared/deploy-trigger@v2
         with:
           environment: staging
-          service-url: ${{ secrets.DEPLOY_STAGING_URL }}
-          token:       ${{ secrets.DEPLOY_STAGING_TOKEN }}
+          service-url: ${{ secrets.JENKINS_DEPLOY_STAGING_URL }}
+          token:       ${{ secrets.JENKINS_DEPLOY_STAGING_TOKEN }}
