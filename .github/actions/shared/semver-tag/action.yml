@@ -68,9 +68,11 @@ runs:
           echo "tag=$TAG_INPUT" >> "$GITHUB_OUTPUT"
         else
           # Calculate next version via bump
+          # Escape PREFIX for safe use in grep -E (e.g. a literal '.' must not match any char)
+          PREFIX_ESC=$(printf '%s' "$PREFIX" | sed 's/[.[\*^$]/\\&/g')
           LATEST=$(git tag --list "${PREFIX}*" \
             --sort=-version:refname \
-            | grep -E "^${PREFIX}[0-9]+\.[0-9]+\.[0-9]+$" \
+            | grep -E "^${PREFIX_ESC}[0-9]+\.[0-9]+\.[0-9]+$" \
             | head -n1)
           LATEST=${LATEST:-${PREFIX}0.0.0}
           VERSION=${LATEST#"$PREFIX"}
