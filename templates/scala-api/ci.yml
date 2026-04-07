@@ -23,6 +23,8 @@ jobs:
     needs: auto-label
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
+    permissions:
+      pull-requests: read
     steps:
       - uses: actions/checkout@v4
       - uses: BQN-UY/CI-CD/.github/actions/shared/label-check@v2

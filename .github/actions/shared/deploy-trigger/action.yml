@@ -70,13 +70,20 @@ runs:
         # corrompan la query string.
         TOKEN_ENC=$(jq -rn --arg t "$TOKEN" '$t | @uri')
 
+        # Construir el separador según si SERVICE_URL ya contiene query params.
+        if [[ "$SERVICE_URL" == *"?"* ]]; then
+          DEPLOY_URL="${SERVICE_URL}&token=${TOKEN_ENC}"
+        else
+          DEPLOY_URL="${SERVICE_URL}?token=${TOKEN_ENC}"
+        fi
+
         # Sin --retry: POST sobre un webhook no idempotente — un retry ante timeout
         # dispararía múltiples deploys si Jenkins ya procesó la request.
         RESPONSE_BODY=$(mktemp)
         HTTP_STATUS=$(curl -s -w "%{http_code}" -o "$RESPONSE_BODY" \
           --connect-timeout 10 \
           --max-time 30 \
-          -X POST "${SERVICE_URL}?token=${TOKEN_ENC}" \
+          -X POST "$DEPLOY_URL" \
           -H "Content-Type: application/json" \
           -d "$PAYLOAD")
 
