@@ -277,7 +277,6 @@ al job Jenkins correcto. Falla si el webhook devuelve un status distinto de `200
 | `token` | ✅ | Token GWT del job Jenkins — determina el ambiente de destino |
 | `sistema` | — | Nombre del servicio a desplegar (var `SISTEMA` del repo) |
 | `version` | — | Versión del artefacto (dynver snapshot o tag release) |
-| `issue-number` | — | Número de issue/ticket asociado al deploy |
 
 > Los secrets `JENKINS_DEPLOY_URL` y los tres tokens son org-level (BQN-UY) — no
 > requieren configuración por repo. Ver detalles completos en [`docs/jenkins.md`](jenkins.md).

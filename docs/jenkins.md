@@ -67,7 +67,7 @@ Content-Type: application/json
   "actor":        "pablo-zebraitis",
   "sistema":      "payments-api",
   "version":      "1.5.0+3-abc1234",
-  "issue_number": ""
+  "installation": ""
 }
 ```
 
@@ -87,7 +87,7 @@ El token es la única fuente de verdad del destino.
     token:        ${{ secrets.JENKINS_DEPLOY_TESTING_TOKEN }}
     sistema:      ${{ vars.SISTEMA }}           # opcional — nombre del servicio
     version:      ${{ steps.publish.outputs.version }}  # opcional — versión del artefacto
-    issue-number: ""               # opcional — ticket asociado al deploy
+    installation: ""               # opcional — vacío = auto_deploy (solo production)
 ```
 
 ### Inputs
@@ -100,7 +100,6 @@ El token es la única fuente de verdad del destino.
 | `sistema` | — | Nombre del sistema a desplegar |
 | `version` | — | Versión del artefacto (dynver snapshot o tag release) |
 | `installation` | — | Instalaciones destino (coma-separado). Vacío = `auto_deploy` en todas. Solo relevante en deploys manuales a production. |
-| `issue-number` | — | Número de issue/ticket asociado |
 
 ---
 
