@@ -308,13 +308,7 @@ name: Make release
 
 on:
   workflow_dispatch:
-    inputs:
-      bump:
-        description: Tipo de bump
-        required: true
-        default: minor
-        type: choice
-        options: [major, minor, patch]
+
 jobs:
   release:
     name: Tag + Nexus + GitHub Release + deploy production + back-merge
@@ -333,11 +327,24 @@ jobs:
 
       - uses: BQN-UY/CI-CD/.github/actions/shared/security-scan@v2
 
+      - name: Extraer versión desde nombre de rama
+        id: version
+        shell: bash
+        run: |
+          # Deriva la versión directamente del nombre de la rama para garantizar
+          # que el tag creado coincide con la versión indicada en la rama.
+          # Soporta release/vX.Y.Z y hotfix/vX.Y.Z-descripcion
+          VERSION=$(echo "${{ github.ref_name }}" | grep -oP '(?<=/)v[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+          if [ -z "$VERSION" ]; then
+            echo "Error: no se pudo extraer versión desde '${GITHUB_REF_NAME}'. Formato esperado: release/vX.Y.Z o hotfix/vX.Y.Z-desc" >&2
+            exit 1
+          fi
+          echo "tag=$VERSION" >> "$GITHUB_OUTPUT"
+
       - name: Crear tag SemVer
-        id: tag
         uses: BQN-UY/CI-CD/.github/actions/shared/semver-tag@v2
         with:
-          bump: ${{ inputs.bump }}
+          tag: ${{ steps.version.outputs.tag }}
 
       - name: Publish release JAR → Nexus
         shell: bash
@@ -350,7 +357,7 @@ jobs:
       - name: GitHub Release
         uses: BQN-UY/CI-CD/.github/actions/shared/github-release@v2
         with:
-          tag: ${{ steps.tag.outputs.tag }}
+          tag: ${{ steps.version.outputs.tag }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

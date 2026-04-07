@@ -8,6 +8,7 @@ jobs:
   publish:
     name: Publish JAR snapshot → Nexus + deploy testing/staging
     runs-on: ubuntu-latest
+    environment: ${{ startsWith(github.ref, 'refs/heads/hotfix/') && 'staging' || 'testing' }}
     steps:
       - uses: actions/checkout@v4
         with:

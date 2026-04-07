@@ -3,9 +3,13 @@ description: Calcula y crea tag SemVer desde historial Git
 
 inputs:
   bump:
-    description: major | minor | patch
-    required: true
+    description: major | minor | patch (ignorado si se proporciona tag)
+    required: false
     default: minor
+  tag:
+    description: Tag exacto a crear (ej. v1.3.0). Si se proporciona, omite el cálculo de bump.
+    required: false
+    default: ""
   prefix:
     description: Prefijo del tag (solo letras, dígitos, '.', '_', '-')
     default: v
@@ -34,6 +38,7 @@ runs:
       env:
         PREFIX: ${{ inputs.prefix }}
         BUMP: ${{ inputs.bump }}
+        TAG_INPUT: ${{ inputs.tag }}
       run: |
         set -euo pipefail
 
@@ -43,31 +48,47 @@ runs:
           exit 1
         fi
 
-        LATEST=$(git tag --list "${PREFIX}*" \
-          --sort=-version:refname \
-          | grep -E "^${PREFIX}[0-9]+\.[0-9]+\.[0-9]+$" \
-          | head -n1)
-        LATEST=${LATEST:-${PREFIX}0.0.0}
-        VERSION=${LATEST#"$PREFIX"}
-
-        if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-          echo "Error: latest tag '$LATEST' does not contain a valid SemVer version (X.Y.Z) after prefix '$PREFIX'." >&2
-          exit 1
-        fi
-
-        IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
-        case "$BUMP" in
-          major) MAJOR=$((MAJOR+1)); MINOR=0; PATCH=0 ;;
-          minor) MINOR=$((MINOR+1)); PATCH=0 ;;
-          patch) PATCH=$((PATCH+1)) ;;
-          *)
-            echo "Error: invalid bump value '$BUMP'. Expected one of: major, minor, patch." >&2
+        if [ -n "$TAG_INPUT" ]; then
+          # Explicit tag provided — validate and use as-is
+          if [[ ! "$TAG_INPUT" =~ ^[A-Za-z0-9._-]+$ ]]; then
+            echo "Error: invalid tag '$TAG_INPUT'. Only letters, digits, '.', '_' and '-' are allowed." >&2
             exit 1
-            ;;
-        esac
-        NEW="$MAJOR.$MINOR.$PATCH"
-        echo "version=$NEW" >> "$GITHUB_OUTPUT"
-        echo "tag=${PREFIX}$NEW" >> "$GITHUB_OUTPUT"
+          fi
+          VERSION="${TAG_INPUT#"$PREFIX"}"
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Error: tag '$TAG_INPUT' does not contain a valid SemVer version (X.Y.Z) after prefix '$PREFIX'." >&2
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG_INPUT" >> "$GITHUB_OUTPUT"
+        else
+          # Calculate next version via bump
+          LATEST=$(git tag --list "${PREFIX}*" \
+            --sort=-version:refname \
+            | grep -E "^${PREFIX}[0-9]+\.[0-9]+\.[0-9]+$" \
+            | head -n1)
+          LATEST=${LATEST:-${PREFIX}0.0.0}
+          VERSION=${LATEST#"$PREFIX"}
+
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Error: latest tag '$LATEST' does not contain a valid SemVer version (X.Y.Z) after prefix '$PREFIX'." >&2
+            exit 1
+          fi
+
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+          case "$BUMP" in
+            major) MAJOR=$((MAJOR+1)); MINOR=0; PATCH=0 ;;
+            minor) MINOR=$((MINOR+1)); PATCH=0 ;;
+            patch) PATCH=$((PATCH+1)) ;;
+            *)
+              echo "Error: invalid bump value '$BUMP'. Expected one of: major, minor, patch." >&2
+              exit 1
+              ;;
+          esac
+          NEW="$MAJOR.$MINOR.$PATCH"
+          echo "version=$NEW" >> "$GITHUB_OUTPUT"
+          echo "tag=${PREFIX}$NEW" >> "$GITHUB_OUTPUT"
+        fi
 
     - name: Create and push tag
       if: ${{ inputs.dry-run != 'true' }}
