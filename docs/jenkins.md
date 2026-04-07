@@ -8,7 +8,7 @@ Referencia de la integración entre GitHub Actions y Jenkins vía el plugin
 ## Visión general
 
 Cada ambiente (`testing`, `staging`, `production`) tiene un job Jenkins dedicado
-con su propio token GWT. La action `shared/deploy-trigger` construye la URL con
+con su propio token GWT. La action `shared/jenkins-deploy-trigger` construye la URL con
 el token como query param `?token=`, lo que hace que GWT rutee el request
 exclusivamente al job que coincide con ese token.
 
@@ -77,10 +77,10 @@ El token es la única fuente de verdad del destino.
 
 ---
 
-## Action: `shared/deploy-trigger`
+## Action: `shared/jenkins-deploy-trigger`
 
 ```yaml
-- uses: BQN-UY/CI-CD/.github/actions/shared/deploy-trigger@v2
+- uses: BQN-UY/CI-CD/.github/actions/shared/jenkins-deploy-trigger@v2
   with:
     environment:  testing          # testing | staging | production
     service-url:  ${{ secrets.JENKINS_DEPLOY_URL }}
@@ -121,7 +121,7 @@ El token es la única fuente de verdad del destino.
 
 - name: Deploy to testing
   if: github.ref == 'refs/heads/develop' || startsWith(github.ref, 'refs/heads/release/')
-  uses: BQN-UY/CI-CD/.github/actions/shared/deploy-trigger@v2
+  uses: BQN-UY/CI-CD/.github/actions/shared/jenkins-deploy-trigger@v2
   with:
     environment: testing
     service-url: ${{ secrets.JENKINS_DEPLOY_URL }}
@@ -131,7 +131,7 @@ El token es la única fuente de verdad del destino.
 
 - name: Deploy to staging
   if: startsWith(github.ref, 'refs/heads/hotfix/')
-  uses: BQN-UY/CI-CD/.github/actions/shared/deploy-trigger@v2
+  uses: BQN-UY/CI-CD/.github/actions/shared/jenkins-deploy-trigger@v2
   with:
     environment: staging
     service-url: ${{ secrets.JENKINS_DEPLOY_URL }}
@@ -144,7 +144,7 @@ El token es la única fuente de verdad del destino.
 
 ```yaml
 - name: Deploy to production
-  uses: BQN-UY/CI-CD/.github/actions/shared/deploy-trigger@v2
+  uses: BQN-UY/CI-CD/.github/actions/shared/jenkins-deploy-trigger@v2
   with:
     environment: production
     service-url: ${{ secrets.JENKINS_DEPLOY_URL }}

@@ -60,7 +60,7 @@ BQN-UY/CI-CD
         │   │   └── action.yml
         │   ├── github-release/
         │   │   └── action.yml
-        │   ├── deploy-trigger/
+        │   ├── jenkins-deploy-trigger/
         │   │   └── action.yml
         │   ├── label-check/
         │   │   └── action.yml
@@ -262,7 +262,7 @@ y sus labels. Usa `softprops/action-gh-release@v2`.
 
 ---
 
-### 3.7 `shared/deploy-trigger`
+### 3.7 `shared/jenkins-deploy-trigger`
 
 Dispara el deploy vía [Generic Webhook Trigger (GWT)](https://plugins.jenkins.io/generic-webhook-trigger/)
 de Jenkins. El token se envía como query param `?token=` — GWT lo usa para rutear
@@ -351,7 +351,7 @@ La versión la calcula sbt-dynver automáticamente (formato: 1.2.0+3-abc1234).
 Pasos:
   1. backend/scala/lint-build
   2. sbt publish                → publica JAR snapshot en Nexus
-  3. shared/deploy-trigger      → deploy a testing (rama == develop o release/**)
+  3. shared/jenkins-deploy-trigger      → deploy a testing (rama == develop o release/**)
                                 → deploy a staging (rama == hotfix/**)
 ```
 
@@ -381,7 +381,7 @@ Pasos:
   6. shared/github-release          → crea GitHub Release con notas
   7. shared/git-merge               → merge release → main
   8. shared/git-merge               → back-merge main → develop
-  9. shared/deploy-trigger          → deploy a production
+  9. shared/jenkins-deploy-trigger          → deploy a production
 ```
 
 #### Fixes durante el ciclo de release — cambio de comportamiento respecto a v1
@@ -468,7 +468,7 @@ Jobs: verify-label + lint-build (html-js) + security
 #### `publish-and-deploy.yml`
 El snapshot del frontend es el artefacto `/dist` guardado en GitHub Actions Artifacts
 (no en Nexus). Si hay CDN o storage propio, se agrega un paso de upload.
-Después del upload, se dispara `shared/deploy-trigger`: `environment: testing` si la rama es `develop` o `release/**`, `environment: staging` si la rama es `hotfix/**`.
+Después del upload, se dispara `shared/jenkins-deploy-trigger`: `environment: testing` si la rama es `develop` o `release/**`, `environment: staging` si la rama es `hotfix/**`.
 
 #### `make-release.yml`
 ```
@@ -479,7 +479,7 @@ Pasos:
   4. shared/github-release          → crea GitHub Release (adjunta /dist)
   5. shared/git-merge               → merge release → main
   6. shared/git-merge               → back-merge main → develop
-  7. shared/deploy-trigger          → dispara deploy via webhook
+  7. shared/jenkins-deploy-trigger          → dispara deploy via webhook
 ```
 
 ---
@@ -499,7 +499,7 @@ Registry), equivalente a los maven-snapshots del stack Scala.
 Tag de imagen: ghcr.io/bqn-uy/{repo}:{github.sha}
 ```
 
-Después de publicar la imagen, se dispara `shared/deploy-trigger`: `environment: testing` si la rama es `develop` o `release/**`, `environment: staging` si la rama es `hotfix/**`.
+Después de publicar la imagen, se dispara `shared/jenkins-deploy-trigger`: `environment: testing` si la rama es `develop` o `release/**`, `environment: staging` si la rama es `hotfix/**`.
 
 #### `make-release.yml`
 ```
@@ -511,7 +511,7 @@ Pasos:
   5. shared/github-release          → crea GitHub Release
   6. shared/git-merge               → merge release → main
   7. shared/git-merge               → back-merge main → develop
-  8. shared/deploy-trigger          → dispara deploy via webhook
+  8. shared/jenkins-deploy-trigger          → dispara deploy via webhook
 ```
 
 ---
@@ -554,7 +554,7 @@ flowchart TD
 
 | Tipo de repo | Action de stack | Actions shared (siempre presentes) |
 |---|---|---|
-| Frontend HTML+JS | `frontend/html-js/lint-build` | `label-check`, `security-scan`, `semver-tag`, `git-merge`, `github-release`, `deploy-trigger` |
+| Frontend HTML+JS | `frontend/html-js/lint-build` | `label-check`, `security-scan`, `semver-tag`, `git-merge`, `github-release`, `jenkins-deploy-trigger` |
 | Frontend Vaadin | `frontend/vaadin/lint-build` | ídem |
 | Frontend Flutter | `frontend/flutter/lint-test` + `build-apk` | ídem |
 | Backend Python/FastAPI | `backend/python/lint-test` | ídem |

@@ -10,7 +10,7 @@ Los reusable workflows v1 (legacy) viven en `.github/workflows/` — no modifica
 - Solo modificar `.github/actions/`, `templates/` y `docs/`
 - NUNCA tocar `.github/workflows/` (legacy v1)
 - Los workflows de proyecto no viven aquí — viven en cada repo de proyecto
-- Ambientes válidos en deploy-trigger: `testing`, `staging`, `production`
+- Ambientes válidos en jenkins-deploy-trigger: `testing`, `staging`, `production`
 
 ## Estructura de una action v2
 

@@ -224,7 +224,7 @@ jobs:
 
       - name: Deploy to testing
         if: github.ref == 'refs/heads/develop' || startsWith(github.ref, 'refs/heads/release/')
-        uses: BQN-UY/CI-CD/.github/actions/shared/deploy-trigger@v2
+        uses: BQN-UY/CI-CD/.github/actions/shared/jenkins-deploy-trigger@v2
         with:
           environment: testing
           service-url: ${{ secrets.JENKINS_DEPLOY_URL }}
@@ -234,7 +234,7 @@ jobs:
 
       - name: Deploy to staging
         if: startsWith(github.ref, 'refs/heads/hotfix/')
-        uses: BQN-UY/CI-CD/.github/actions/shared/deploy-trigger@v2
+        uses: BQN-UY/CI-CD/.github/actions/shared/jenkins-deploy-trigger@v2
         with:
           environment: staging
           service-url: ${{ secrets.JENKINS_DEPLOY_URL }}
@@ -381,7 +381,7 @@ jobs:
           target: develop
 
       - name: Deploy to production
-        uses: BQN-UY/CI-CD/.github/actions/shared/deploy-trigger@v2
+        uses: BQN-UY/CI-CD/.github/actions/shared/jenkins-deploy-trigger@v2
         with:
           environment: production
           service-url: ${{ secrets.JENKINS_DEPLOY_URL }}

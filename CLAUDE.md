@@ -8,7 +8,7 @@ Contiene las composite actions reutilizables (v2) y los reusable workflows hered
 ```
 .github/
 ├── actions/          ← composite actions v2  — MODIFICAR AQUÍ
-│   ├── shared/       ← lógica agnóstica de stack (deploy-trigger, semver-tag, etc.)
+│   ├── shared/       ← lógica agnóstica de stack (jenkins-deploy-trigger, semver-tag, etc.)
 │   ├── frontend/     ← acciones por stack frontend (html-js, vaadin, flutter)
 │   └── backend/      ← acciones por stack backend (scala, python, node)
 └── workflows/        ← reusable workflows v1  — NO MODIFICAR (legacy)
@@ -25,7 +25,7 @@ docs/                 ← documentación de referencia v2
 - Los workflows de cada proyecto NO viven aquí — viven en el repo del proyecto
 - Toda nueva action v2 va en `.github/actions/<capa>/<stack>/<nombre>/action.yml`
 
-## Ambientes válidos (`shared/deploy-trigger`)
+## Ambientes válidos (`shared/jenkins-deploy-trigger`)
 
 `testing` | `staging` | `production`
 
