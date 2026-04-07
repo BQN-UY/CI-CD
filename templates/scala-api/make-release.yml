@@ -73,3 +73,5 @@ jobs:
           environment: production
           service-url: ${{ secrets.JENKINS_DEPLOY_URL }}
           token:       ${{ secrets.JENKINS_DEPLOY_PRODUCTION_TOKEN }}
+          sistema:     ${{ vars.SISTEMA }}
+          version:     ${{ steps.version.outputs.tag }}

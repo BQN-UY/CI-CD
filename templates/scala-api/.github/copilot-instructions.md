@@ -27,13 +27,17 @@ directamente en los workflows — todo se delega a actions de `BQN-UY/CI-CD`.
 | `hotfix/**` | staging |
 | `make-release` | production |
 
-## Secrets de deploy
+## Secrets y variables de deploy
 
 ```
-JENKINS_DEPLOY_URL (compartido)
-JENKINS_DEPLOY_TESTING_TOKEN
-JENKINS_DEPLOY_STAGING_TOKEN
-JENKINS_DEPLOY_PRODUCTION_TOKEN
+# Org-level (BQN-UY) — no configurar por repo
+JENKINS_DEPLOY_URL              # URL base del webhook GWT
+JENKINS_DEPLOY_TESTING_TOKEN    # token → rutea a deploy-nexus-testing
+JENKINS_DEPLOY_STAGING_TOKEN    # token → rutea a deploy-nexus-staging
+JENKINS_DEPLOY_PRODUCTION_TOKEN # token → rutea a deploy-nexus-production
+
+# Repo-level variable
+vars.SISTEMA   # nombre del servicio (ej. payments-api)
 ```
 
 ## Secrets de Nexus

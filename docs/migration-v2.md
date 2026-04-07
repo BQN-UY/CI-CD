@@ -261,19 +261,23 @@ y sus labels. Usa `softprops/action-gh-release@v2`.
 
 ### 3.7 `shared/deploy-trigger`
 
-Dispara el deploy vía webhook HTTP. El `service-url` y el `token` se configuran como
-secrets en cada repo del proyecto. Falla si el webhook devuelve un status distinto de
-`200` o `204`.
+Dispara el deploy vía [Generic Webhook Trigger (GWT)](https://plugins.jenkins.io/generic-webhook-trigger/)
+de Jenkins. El token se envía como query param `?token=` — GWT lo usa para rutear
+al job Jenkins correcto. Falla si el webhook devuelve un status distinto de `200` o `204`.
 
-**Inputs requeridos:**
+**Inputs:**
 
-| Input | Descripción |
-|---|---|
-| `environment` | `testing` \| `staging` \| `production` |
-| `service-url` | URL del webhook de deploy |
-| `token` | Token de autenticación |
+| Input | Requerido | Descripción |
+|---|---|---|
+| `environment` | ✅ | `testing` \| `staging` \| `production` |
+| `service-url` | ✅ | URL base del webhook GWT (`JENKINS_DEPLOY_URL`) |
+| `token` | ✅ | Token GWT del job Jenkins — determina el ambiente de destino |
+| `sistema` | — | Nombre del servicio a desplegar (var `SISTEMA` del repo) |
+| `version` | — | Versión del artefacto (dynver snapshot o tag release) |
+| `issue-number` | — | Número de issue/ticket asociado al deploy |
 
-> Los repos de proyecto deben tener un secret de URL compartido (`JENKINS_DEPLOY_URL`) y un token por ambiente (`JENKINS_DEPLOY_TESTING_TOKEN`, `JENKINS_DEPLOY_STAGING_TOKEN`, `JENKINS_DEPLOY_PRODUCTION_TOKEN`). El aislamiento de credenciales se mantiene vía los tokens — `publish-and-deploy.yml` (automático) nunca tiene acceso al token de production.
+> Los secrets `JENKINS_DEPLOY_URL` y los tres tokens son org-level (BQN-UY) — no
+> requieren configuración por repo. Ver detalles completos en [`docs/jenkins.md`](jenkins.md).
 
 ---
 

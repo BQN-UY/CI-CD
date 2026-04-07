@@ -212,8 +212,11 @@ jobs:
       - uses: BQN-UY/CI-CD/.github/actions/backend/scala/lint-build@v2
 
       - name: Publish snapshot to Nexus
+        id: publish
         shell: bash
-        run: sbt publish
+        run: |
+          sbt publish
+          echo "version=$(sbt -batch -error 'print dynver')" >> "$GITHUB_OUTPUT"
         env:
           NEXUS_USER:     ${{ secrets.NEXUS_USER }}
           NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
@@ -226,6 +229,8 @@ jobs:
           environment: testing
           service-url: ${{ secrets.JENKINS_DEPLOY_URL }}
           token:       ${{ secrets.JENKINS_DEPLOY_TESTING_TOKEN }}
+          sistema:     ${{ vars.SISTEMA }}
+          version:     ${{ steps.publish.outputs.version }}
 
       - name: Deploy to staging
         if: startsWith(github.ref, 'refs/heads/hotfix/')
@@ -234,6 +239,8 @@ jobs:
           environment: staging
           service-url: ${{ secrets.JENKINS_DEPLOY_URL }}
           token:       ${{ secrets.JENKINS_DEPLOY_STAGING_TOKEN }}
+          sistema:     ${{ vars.SISTEMA }}
+          version:     ${{ steps.publish.outputs.version }}
 ```
 
 ### Fixes durante el ciclo de release
@@ -422,19 +429,36 @@ jobs:
 
 ---
 
-## Paso 5 — Secrets requeridos en el repositorio
+## Paso 5 — Secrets y variables requeridos
 
-Confirmar con DevOps que los siguientes secrets están configurados en el repo:
+### Secrets de Nexus (nivel repo o org)
+
+Confirmar con DevOps que los siguientes secrets están disponibles en el repo:
 
 | Secret | Descripción |
 |---|---|
 | `NEXUS_USER` | Usuario de Nexus |
 | `NEXUS_PASSWORD` | Contraseña de Nexus |
 | `NEXUS_URL` | URL base del repositorio Nexus |
-| `JENKINS_DEPLOY_URL` | Endpoint del webhook de deploy (compartido por todos los ambientes) |
-| `JENKINS_DEPLOY_TESTING_TOKEN` | Token de autenticación — ambiente testing |
-| `JENKINS_DEPLOY_STAGING_TOKEN` | Token de autenticación — ambiente staging |
-| `JENKINS_DEPLOY_PRODUCTION_TOKEN` | Token de autenticación — ambiente production |
+
+### Secrets de Jenkins (org-level — ya configurados en BQN-UY)
+
+Los siguientes secrets son **org-level** y no requieren configuración por repo:
+
+| Secret | Descripción |
+|---|---|
+| `JENKINS_DEPLOY_URL` | `https://jenkins.bqn.uy/generic-webhook-trigger/invoke` |
+| `JENKINS_DEPLOY_TESTING_TOKEN` | Token GWT — job `deploy-nexus-testing` |
+| `JENKINS_DEPLOY_STAGING_TOKEN` | Token GWT — job `deploy-nexus-staging` |
+| `JENKINS_DEPLOY_PRODUCTION_TOKEN` | Token GWT — job `deploy-nexus-production` |
+
+> Ver [`docs/jenkins.md`](../docs/jenkins.md) para el detalle del mecanismo de ruteo por token.
+
+### Variable de repo requerida
+
+| Variable | Descripción |
+|---|---|
+| `SISTEMA` | Nombre del servicio (ej. `payments-api`). Configurable en **Settings → Variables → Actions** del repo. |
 
 Los secrets `DEPLOY_KEY`, `DEPLOY_IP`, `DEPLOY_PORT`, `DEPLOY_USER`, `JENKINS_USER`,
 `JENKINS_TOKEN` y `PUBLISHER_PATH` usados en v1 **dejan de ser necesarios** en v2.
@@ -470,7 +494,8 @@ actualizar esa referencia para que use la convención de sbt-dynver antes de mig
 [ ] start-release.yml creado
 [ ] make-release.yml actualizado a v2
 [ ] start-hotfix.yml actualizado a v2
-[ ] Secrets de deploy configurados por DevOps (JENKINS_DEPLOY_URL, JENKINS_DEPLOY_TESTING_TOKEN, JENKINS_DEPLOY_STAGING_TOKEN, JENKINS_DEPLOY_PRODUCTION_TOKEN)
+[ ] Secrets de Jenkins confirmados como org-level (JENKINS_DEPLOY_URL, JENKINS_DEPLOY_*_TOKEN)
+[ ] Variable SISTEMA configurada en Settings → Variables → Actions del repo
 [ ] CLAUDE.md copiado desde templates/scala-api/CLAUDE.md
 [ ] .github/copilot-instructions.md copiado desde templates/scala-api/.github/copilot-instructions.md
 [ ] PR abierto con label feature hacia develop

@@ -44,15 +44,16 @@ Este proyecto usa CI/CD v2 de BQN-UY. Las actions reutilizables viven en
 | `make-release.yml` | manual (workflow_dispatch) | tag + Nexus release + GitHub Release + deploy production + back-merge |
 | `start-hotfix.yml` | manual (workflow_dispatch) | crea `hotfix/vX.Y.Z-desc` desde main |
 
-## Secrets requeridos
+## Secrets y variables requeridos
 
-| Secret | Uso |
-|---|---|
-| `NEXUS_USER` / `NEXUS_PASSWORD` / `NEXUS_URL` | Publicar JAR en Nexus |
-| `JENKINS_DEPLOY_URL` | Endpoint webhook (compartido por todos los ambientes) |
-| `JENKINS_DEPLOY_TESTING_TOKEN` | Token de autenticación — deploy a testing |
-| `JENKINS_DEPLOY_STAGING_TOKEN` | Token de autenticación — deploy a staging |
-| `JENKINS_DEPLOY_PRODUCTION_TOKEN` | Token de autenticación — deploy a production |
+| Secret / Variable | Nivel | Uso |
+|---|---|---|
+| `NEXUS_USER` / `NEXUS_PASSWORD` / `NEXUS_URL` | repo | Publicar JAR en Nexus |
+| `JENKINS_DEPLOY_URL` | **org** | URL base del webhook GWT (igual para todos los ambientes) |
+| `JENKINS_DEPLOY_TESTING_TOKEN` | **org** | Token GWT — rutea al job `deploy-nexus-testing` |
+| `JENKINS_DEPLOY_STAGING_TOKEN` | **org** | Token GWT — rutea al job `deploy-nexus-staging` |
+| `JENKINS_DEPLOY_PRODUCTION_TOKEN` | **org** | Token GWT — rutea al job `deploy-nexus-production` |
+| `vars.SISTEMA` | repo | Nombre del servicio — se pasa en el payload al webhook |
 
 ## Qué NO hacer
 

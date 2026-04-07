@@ -28,9 +28,10 @@ Capas: `shared/` (agnóstico de stack) | `frontend/<stack>/` | `backend/<stack>/
 | `hotfix/**` | staging |
 | `make-release` | production |
 
-## Secrets de deploy (patrón de nombres)
+## Secrets y variables de deploy
 
-`JENKINS_DEPLOY_URL` (compartido por todos los ambientes)
-`JENKINS_DEPLOY_TESTING_TOKEN`
-`JENKINS_DEPLOY_STAGING_TOKEN`
-`JENKINS_DEPLOY_PRODUCTION_TOKEN`
+Org-level (BQN-UY): `JENKINS_DEPLOY_URL`, `JENKINS_DEPLOY_TESTING_TOKEN`, `JENKINS_DEPLOY_STAGING_TOKEN`, `JENKINS_DEPLOY_PRODUCTION_TOKEN`
+
+Repo-level variable: `vars.SISTEMA` (nombre del servicio, ej. `payments-api`)
+
+El token va como `?token=` en la URL — GWT lo usa para rutear al job Jenkins correcto. Ver `docs/jenkins.md`.

@@ -17,8 +17,11 @@ jobs:
       - uses: BQN-UY/CI-CD/.github/actions/backend/scala/lint-build@v2
 
       - name: Publish snapshot to Nexus
+        id: publish
         shell: bash
-        run: sbt publish
+        run: |
+          sbt publish
+          echo "version=$(sbt -batch -error 'print dynver')" >> "$GITHUB_OUTPUT"
         env:
           NEXUS_USER:     ${{ secrets.NEXUS_USER }}
           NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
@@ -31,6 +34,8 @@ jobs:
           environment: testing
           service-url: ${{ secrets.JENKINS_DEPLOY_URL }}
           token:       ${{ secrets.JENKINS_DEPLOY_TESTING_TOKEN }}
+          sistema:     ${{ vars.SISTEMA }}
+          version:     ${{ steps.publish.outputs.version }}
 
       - name: Deploy to staging
         if: startsWith(github.ref, 'refs/heads/hotfix/')
@@ -39,3 +44,5 @@ jobs:
           environment: staging
           service-url: ${{ secrets.JENKINS_DEPLOY_URL }}
           token:       ${{ secrets.JENKINS_DEPLOY_STAGING_TOKEN }}
+          sistema:     ${{ vars.SISTEMA }}
+          version:     ${{ steps.publish.outputs.version }}

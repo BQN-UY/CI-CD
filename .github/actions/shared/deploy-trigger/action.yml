@@ -1,31 +1,46 @@
-name: Deploy trigger
-description: Dispara deploy vía webhook configurable por repo
+name: Jenkins deploy trigger
+description: Dispara deploy vía Generic Webhook Trigger (GWT) de Jenkins
 
 inputs:
   environment:
     description: testing | staging | production
     required: true
   service-url:
-    description: URL del webhook de deploy
+    description: URL base del webhook GWT (ej. https://jenkins.bqn.uy/generic-webhook-trigger/invoke)
     required: true
   token:
-    description: Token de autenticación
+    description: Token GWT del job Jenkins. Se envía como ?token= para rutear al job correcto.
     required: true
+  sistema:
+    description: Nombre del sistema/servicio a desplegar (ej. payments-api)
+    required: false
+    default: ""
+  version:
+    description: Versión del artefacto a desplegar (ej. 1.5.0 o 1.5.0+3-abc1234)
+    required: false
+    default: ""
+  issue-number:
+    description: Número de issue o ticket asociado al deploy (opcional)
+    required: false
+    default: ""
 
 runs:
   using: composite
   steps:
     - name: Trigger deploy
       shell: bash
+      env:
+        ENV:          ${{ inputs.environment }}
+        SERVICE_URL:  ${{ inputs.service-url }}
+        TOKEN:        ${{ inputs.token }}
+        SISTEMA:      ${{ inputs.sistema }}
+        VERSION:      ${{ inputs.version }}
+        ISSUE_NUMBER: ${{ inputs.issue-number }}
+        GH_SHA:       ${{ github.sha }}
+        GH_ACTOR:     ${{ github.actor }}
       run: |
-        # Normalizar alias obsoleto
-        ENV="${{ inputs.environment }}"
-        if [ "$ENV" = "dev" ]; then
-          echo "Warning: 'dev' es un alias obsoleto — usar 'testing'. El valor se normaliza a 'testing'." >&2
-          ENV="testing"
-        fi
+        set -euo pipefail
 
-        # Validar ambiente
         case "$ENV" in
           testing|staging|production) ;;
           *)
@@ -34,25 +49,32 @@ runs:
             ;;
         esac
 
+        # El token va como query param — GWT lo usa para rutear al job correcto.
+        # No se usa Authorization header porque GWT no lo soporta por defecto.
+        PAYLOAD=$(jq -nc \
+          --arg environment  "$ENV" \
+          --arg ref          "$GH_SHA" \
+          --arg actor        "$GH_ACTOR" \
+          --arg sistema      "$SISTEMA" \
+          --arg version      "$VERSION" \
+          --arg issue_number "$ISSUE_NUMBER" \
+          '{environment: $environment, ref: $ref, actor: $actor,
+            sistema: $sistema, version: $version, issue_number: $issue_number}')
+
         # No usar --retry-all-errors en POST para evitar múltiples deploys
         # ante timeouts o errores 5xx en webhooks no idempotentes.
-        # Solo se reintenta ante errores de conexión (--retry maneja CURLE_* codes).
         RESPONSE_BODY=$(mktemp)
         HTTP_STATUS=$(curl -s -w "%{http_code}" -o "$RESPONSE_BODY" \
           --connect-timeout 10 \
           --max-time 30 \
           --retry 3 \
-          -X POST "${{ inputs.service-url }}" \
-          -H "Authorization: Bearer ${{ inputs.token }}" \
+          -X POST "${SERVICE_URL}?token=${TOKEN}" \
           -H "Content-Type: application/json" \
-          -d "{
-            \"environment\": \"$ENV\",
-            \"ref\": \"${{ github.sha }}\",
-            \"actor\": \"${{ github.actor }}\"
-          }")
+          -d "$PAYLOAD")
+
         if [ "$HTTP_STATUS" != "200" ] && [ "$HTTP_STATUS" != "204" ]; then
           echo "Webhook failed — HTTP $HTTP_STATUS" >&2
-          echo "Response body: $(cat "$RESPONSE_BODY" | head -c 500)" >&2
+          echo "Response body: $(head -c 500 "$RESPONSE_BODY")" >&2
           rm -f "$RESPONSE_BODY"
           exit 1
         fi
