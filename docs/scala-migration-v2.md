@@ -224,16 +224,16 @@ jobs:
         uses: BQN-UY/CI-CD/.github/actions/shared/deploy-trigger@v2
         with:
           environment: testing
-          service-url: ${{ secrets.TESTING_DEPLOY_WEBHOOK_URL }}
-          token:       ${{ secrets.TESTING_DEPLOY_TOKEN }}
+          service-url: ${{ secrets.DEPLOY_TESTING_URL }}
+          token:       ${{ secrets.DEPLOY_TESTING_TOKEN }}
 
       - name: Deploy to staging
         if: startsWith(github.ref, 'refs/heads/hotfix/')
         uses: BQN-UY/CI-CD/.github/actions/shared/deploy-trigger@v2
         with:
           environment: staging
-          service-url: ${{ secrets.DEPLOY_WEBHOOK_URL }}
-          token:       ${{ secrets.DEPLOY_TOKEN }}
+          service-url: ${{ secrets.DEPLOY_STAGING_URL }}
+          token:       ${{ secrets.DEPLOY_STAGING_TOKEN }}
 ```
 
 ### `start-release.yml`
@@ -347,11 +347,21 @@ jobs:
           source: main
           target: develop
 
-      - uses: BQN-UY/CI-CD/.github/actions/shared/deploy-trigger@v2
+      - name: Deploy to staging
+        if: inputs.environment == 'staging'
+        uses: BQN-UY/CI-CD/.github/actions/shared/deploy-trigger@v2
         with:
-          environment: ${{ inputs.environment }}
-          service-url: ${{ secrets.DEPLOY_WEBHOOK_URL }}
-          token:       ${{ secrets.DEPLOY_TOKEN }}
+          environment: staging
+          service-url: ${{ secrets.DEPLOY_STAGING_URL }}
+          token:       ${{ secrets.DEPLOY_STAGING_TOKEN }}
+
+      - name: Deploy to production
+        if: inputs.environment == 'production'
+        uses: BQN-UY/CI-CD/.github/actions/shared/deploy-trigger@v2
+        with:
+          environment: production
+          service-url: ${{ secrets.DEPLOY_PRODUCTION_URL }}
+          token:       ${{ secrets.DEPLOY_PRODUCTION_TOKEN }}
 ```
 
 ### `start-hotfix.yml`
@@ -404,10 +414,12 @@ Confirmar con DevOps que los siguientes secrets están configurados en el repo:
 | `NEXUS_USER` | Usuario de Nexus |
 | `NEXUS_PASSWORD` | Contraseña de Nexus |
 | `NEXUS_URL` | URL base del repositorio Nexus |
-| `DEPLOY_WEBHOOK_URL` | Endpoint del webhook de deploy (staging / production) |
-| `DEPLOY_TOKEN` | Token de autenticación del webhook (staging / production) |
-| `TESTING_DEPLOY_WEBHOOK_URL` | Endpoint del webhook de deploy para el ambiente de testing |
-| `TESTING_DEPLOY_TOKEN` | Token de autenticación del webhook de testing |
+| `DEPLOY_TESTING_URL` | Endpoint del webhook de deploy — ambiente testing |
+| `DEPLOY_TESTING_TOKEN` | Token de autenticación — ambiente testing |
+| `DEPLOY_STAGING_URL` | Endpoint del webhook de deploy — ambiente staging |
+| `DEPLOY_STAGING_TOKEN` | Token de autenticación — ambiente staging |
+| `DEPLOY_PRODUCTION_URL` | Endpoint del webhook de deploy — ambiente production |
+| `DEPLOY_PRODUCTION_TOKEN` | Token de autenticación — ambiente production |
 
 Los secrets `DEPLOY_KEY`, `DEPLOY_IP`, `DEPLOY_PORT`, `DEPLOY_USER`, `JENKINS_USER`,
 `JENKINS_TOKEN` y `PUBLISHER_PATH` usados en v1 **dejan de ser necesarios** en v2.
@@ -443,7 +455,7 @@ actualizar esa referencia para que use la convención de sbt-dynver antes de mig
 [ ] start-release.yml creado
 [ ] make-release.yml actualizado a v2
 [ ] start-hotfix.yml actualizado a v2
-[ ] Secrets de deploy configurados por DevOps (DEPLOY_WEBHOOK_URL, DEPLOY_TOKEN, TESTING_DEPLOY_WEBHOOK_URL, TESTING_DEPLOY_TOKEN)
+[ ] Secrets de deploy configurados por DevOps (DEPLOY_TESTING_URL, DEPLOY_TESTING_TOKEN, DEPLOY_STAGING_URL, DEPLOY_STAGING_TOKEN, DEPLOY_PRODUCTION_URL, DEPLOY_PRODUCTION_TOKEN)
 [ ] PR abierto con label feature hacia develop
 [ ] CI pasa en la feature branch
 ```
