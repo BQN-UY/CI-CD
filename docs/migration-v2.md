@@ -366,15 +366,18 @@ Pasos:
 Trigger: workflow_dispatch
 Inputs:  bump (major | minor | patch) + environment (staging | production)
 
-Pasos:
+Pasos (siempre):
   1. backend/scala/lint-build
   2. shared/security-scan
-  3. shared/semver-tag              → crea el tag Git
-  4. sbt publish                    → publica JAR release en Nexus
-  5. shared/github-release          → crea GitHub Release con notas
-  6. shared/git-merge               → merge release → main
-  7. shared/git-merge               → back-merge main → develop
-  8. shared/deploy-trigger          → dispara deploy via webhook
+  3. shared/deploy-trigger          → deploy a staging  (solo si environment == staging)
+
+Pasos (solo si environment == production):
+  4. shared/semver-tag              → crea el tag Git
+  5. sbt publish                    → publica JAR release en Nexus maven-releases
+  6. shared/github-release          → crea GitHub Release con notas
+  7. shared/git-merge               → merge release → main
+  8. shared/git-merge               → back-merge main → develop
+  9. shared/deploy-trigger          → deploy a production
 ```
 
 #### `start-hotfix.yml` — crea la hotfix branch
