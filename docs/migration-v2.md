@@ -338,14 +338,14 @@ Jobs:
 #### `publish-and-deploy.yml` — publica snapshot a Nexus y despliega automáticamente
 
 ```
-Trigger: push → develop  |  push → hotfix/**
+Trigger: push → develop  |  push → hotfix/**  |  push → release/**
 
 La versión la calcula sbt-dynver automáticamente (formato: 1.2.0+3-abc1234).
 Pasos:
   1. backend/scala/lint-build
   2. sbt publish                → publica JAR snapshot en Nexus
   3. shared/deploy-trigger      → deploy a testing (solo si rama == develop)
-                                → deploy a staging (solo si rama == hotfix/**)
+                                → deploy a staging (solo si rama == hotfix/** o release/**)
 ```
 
 #### `start-release.yml` — crea la release branch
@@ -360,24 +360,21 @@ Pasos:
   3. Crea y pushea branch release/v{version}
 ```
 
-#### `make-release.yml` — hace el release completo
+#### `make-release.yml` — hace el release completo a production
 
 ```
 Trigger: workflow_dispatch
-Inputs:  bump (major | minor | patch) + environment (staging | production)
+Input:   bump (major | minor | patch)
 
-Pasos (siempre):
+Pasos:
   1. backend/scala/lint-build
   2. shared/security-scan
-  3. shared/deploy-trigger          → deploy a staging  (solo si environment == staging)
-
-Pasos (solo si environment == production):
-  4. shared/semver-tag              → crea el tag Git
-  5. sbt publish                    → publica JAR release en Nexus maven-releases
-  6. shared/github-release          → crea GitHub Release con notas
-  7. shared/git-merge               → merge release → main
-  8. shared/git-merge               → back-merge main → develop
-  9. shared/deploy-trigger          → deploy a production
+  3. shared/semver-tag              → crea el tag Git
+  4. sbt publish                    → publica JAR release en Nexus maven-releases
+  5. shared/github-release          → crea GitHub Release con notas
+  6. shared/git-merge               → merge release → main
+  7. shared/git-merge               → back-merge main → develop
+  8. shared/deploy-trigger          → deploy a production
 ```
 
 #### `start-hotfix.yml` — crea la hotfix branch
@@ -487,7 +484,7 @@ flowchart TD
     subgraph auto["publish-and-deploy.yml — automático"]
         direction LR
         p1["push: develop"] --> p2["lint-build\npublish snapshot"]
-        p3["push: hotfix/**"] --> p4["lint-build\npublish snapshot"]
+        p3["push: hotfix/**\npush: release/**"] --> p4["lint-build\npublish snapshot"]
         p2 --> dev[/"env: testing"/]
         p4 --> stg1[/"env: staging"/]
     end
@@ -495,7 +492,7 @@ flowchart TD
     subgraph manual["make-release.yml — manual (workflow_dispatch)"]
         direction LR
         m1["release/vX.Y.Z"] --> m2["lint-build\nsecurity-scan\nsemver-tag\npublish release\ngithub-release\ngit-merge ×2"]
-        m2 --> stg2[/"env: staging\nenv: production"/]
+        m2 --> prod[/"env: production"/]
     end
 ```
 

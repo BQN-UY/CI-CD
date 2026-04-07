@@ -194,11 +194,11 @@ jobs:
 ### `publish-and-deploy.yml`
 
 ```yaml
-name: Publish snapshot
+name: Publish and deploy
 
 on:
   push:
-    branches: [develop, "hotfix/**"]
+    branches: [develop, "hotfix/**", "release/**"]
 
 jobs:
   publish:
@@ -228,7 +228,7 @@ jobs:
           token:       ${{ secrets.DEPLOY_TESTING_TOKEN }}
 
       - name: Deploy to staging
-        if: startsWith(github.ref, 'refs/heads/hotfix/')
+        if: startsWith(github.ref, 'refs/heads/hotfix/') || startsWith(github.ref, 'refs/heads/release/')
         uses: BQN-UY/CI-CD/.github/actions/shared/deploy-trigger@v2
         with:
           environment: staging
@@ -296,7 +296,7 @@ on:
         required: true
         default: production
         type: choice
-        options: [staging, production]
+        options: [production]
 
 jobs:
   release:
@@ -315,27 +315,13 @@ jobs:
 
       - uses: BQN-UY/CI-CD/.github/actions/shared/security-scan@v2
 
-      - name: Deploy to staging
-        if: inputs.environment == 'staging'
-        uses: BQN-UY/CI-CD/.github/actions/shared/deploy-trigger@v2
-        with:
-          environment: staging
-          service-url: ${{ secrets.DEPLOY_STAGING_URL }}
-          token:       ${{ secrets.DEPLOY_STAGING_TOKEN }}
-
-      # Los pasos siguientes solo se ejecutan al deployar a production.
-      # El tag, el artefacto de release y el merge son efectos permanentes
-      # que no deben crearse hasta que staging haya sido validado.
-
       - name: Crear tag SemVer
-        if: inputs.environment == 'production'
         id: tag
         uses: BQN-UY/CI-CD/.github/actions/shared/semver-tag@v2
         with:
           bump: ${{ inputs.bump }}
 
       - name: Publish release JAR → Nexus
-        if: inputs.environment == 'production'
         shell: bash
         run: sbt publish
         env:
@@ -344,7 +330,6 @@ jobs:
           NEXUS_URL:      ${{ secrets.NEXUS_URL }}
 
       - name: GitHub Release
-        if: inputs.environment == 'production'
         uses: BQN-UY/CI-CD/.github/actions/shared/github-release@v2
         with:
           tag: ${{ steps.tag.outputs.tag }}
@@ -352,21 +337,18 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Merge release → main
-        if: inputs.environment == 'production'
         uses: BQN-UY/CI-CD/.github/actions/shared/git-merge@v2
         with:
           source: ${{ github.ref_name }}
           target: main
 
       - name: Back-merge main → develop
-        if: inputs.environment == 'production'
         uses: BQN-UY/CI-CD/.github/actions/shared/git-merge@v2
         with:
           source: main
           target: develop
 
       - name: Deploy to production
-        if: inputs.environment == 'production'
         uses: BQN-UY/CI-CD/.github/actions/shared/deploy-trigger@v2
         with:
           environment: production

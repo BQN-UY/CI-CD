@@ -9,18 +9,11 @@ on:
         default: minor
         type: choice
         options: [major, minor, patch]
-      environment:
-        description: Entorno de deploy
-        required: true
-        default: production
-        type: choice
-        options: [staging, production]
 
 jobs:
   release:
-    name: Tag + Nexus + GitHub Release + deploy + back-merge
+    name: Tag + Nexus + GitHub Release + deploy production + back-merge
     runs-on: ubuntu-latest
-    environment: ${{ inputs.environment }}
     permissions:
       contents: write             # requerido para crear tags y hacer push de ramas
       security-events: write      # requerido para subir SARIF al tab de Security
@@ -33,27 +26,13 @@ jobs:
 
       - uses: BQN-UY/CI-CD/.github/actions/shared/security-scan@v2
 
-      - name: Deploy to staging
-        if: inputs.environment == 'staging'
-        uses: BQN-UY/CI-CD/.github/actions/shared/deploy-trigger@v2
-        with:
-          environment: staging
-          service-url: ${{ secrets.DEPLOY_STAGING_URL }}
-          token:       ${{ secrets.DEPLOY_STAGING_TOKEN }}
-
-      # Los pasos siguientes solo se ejecutan al deployar a production.
-      # El tag, el artefacto de release y el merge son efectos permanentes
-      # que no deben crearse hasta que staging haya sido validado.
-
       - name: Crear tag SemVer
-        if: inputs.environment == 'production'
         id: tag
         uses: BQN-UY/CI-CD/.github/actions/shared/semver-tag@v2
         with:
           bump: ${{ inputs.bump }}
 
       - name: Publish release JAR → Nexus
-        if: inputs.environment == 'production'
         shell: bash
         run: sbt publish
         env:
@@ -62,7 +41,6 @@ jobs:
           NEXUS_URL:      ${{ secrets.NEXUS_URL }}
 
       - name: GitHub Release
-        if: inputs.environment == 'production'
         uses: BQN-UY/CI-CD/.github/actions/shared/github-release@v2
         with:
           tag: ${{ steps.tag.outputs.tag }}
@@ -70,21 +48,18 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Merge release → main
-        if: inputs.environment == 'production'
         uses: BQN-UY/CI-CD/.github/actions/shared/git-merge@v2
         with:
           source: ${{ github.ref_name }}
           target: main
 
       - name: Back-merge main → develop
-        if: inputs.environment == 'production'
         uses: BQN-UY/CI-CD/.github/actions/shared/git-merge@v2
         with:
           source: main
           target: develop
 
       - name: Deploy to production
-        if: inputs.environment == 'production'
         uses: BQN-UY/CI-CD/.github/actions/shared/deploy-trigger@v2
         with:
           environment: production

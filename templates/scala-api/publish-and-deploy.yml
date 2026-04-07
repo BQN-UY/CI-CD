@@ -2,7 +2,7 @@ name: Publish and deploy
 
 on:
   push:
-    branches: [develop, "hotfix/**"]
+    branches: [develop, "hotfix/**", "release/**"]
 
 jobs:
   publish:
@@ -32,7 +32,7 @@ jobs:
           token:       ${{ secrets.DEPLOY_TESTING_TOKEN }}
 
       - name: Deploy to staging
-        if: startsWith(github.ref, 'refs/heads/hotfix/')
+        if: startsWith(github.ref, 'refs/heads/hotfix/') || startsWith(github.ref, 'refs/heads/release/')
         uses: BQN-UY/CI-CD/.github/actions/shared/deploy-trigger@v2
         with:
           environment: staging
