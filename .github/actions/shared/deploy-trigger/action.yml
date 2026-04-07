@@ -20,6 +20,7 @@ runs:
       run: |
         case "${{ inputs.environment }}" in
           testing|staging|production) ;;
+          dev) echo "Warning: 'dev' es un alias obsoleto — usar 'testing'." >&2 ;;
           *)
             echo "Error: invalid environment '${{ inputs.environment }}'. Expected one of: testing, staging, production." >&2
             exit 1

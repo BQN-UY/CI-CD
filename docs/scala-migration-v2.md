@@ -244,9 +244,9 @@ jobs:
 Una vez creada la rama `release/vX.Y.Z` con `start-release.yml`, esa rama y
 `develop` son **independientes**. Los commits que lleguen a `develop` después
 del `start-release` son para la **próxima versión** — no afectan el release en
-curso ni re-publican en staging.
+curso ni re-publican en testing.
 
-**Si se detecta un problema durante el testeo en staging, el fix se commitea
+**Si se detecta un problema durante el testeo en testing, el fix se commitea
 directamente sobre `release/vX.Y.Z` — nunca sobre `develop`.**
 
 El push a `release/vX.Y.Z` dispara `publish-and-deploy.yml` automáticamente:
@@ -311,17 +311,11 @@ on:
         default: minor
         type: choice
         options: [major, minor, patch]
-      environment:
-        description: Entorno de deploy
-        required: true
-        default: production
-        type: choice
-        options: [production]
-
 jobs:
   release:
-    name: Tag + Nexus + GitHub Release + deploy + back-merge
+    name: Tag + Nexus + GitHub Release + deploy production + back-merge
     runs-on: ubuntu-latest
+    if: startsWith(github.ref_name, 'release/') || startsWith(github.ref_name, 'hotfix/')
     environment: ${{ inputs.environment }}
     permissions:
       contents: write          # requerido para crear tags y hacer push de ramas

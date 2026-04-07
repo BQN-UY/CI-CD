@@ -387,7 +387,7 @@ Una vez ejecutado `start-release.yml`, la rama `release/vX.Y.Z` y `develop` son
 son para la **próxima versión** — no se incluyen en el release en curso ni
 re-publican en staging.
 
-**Si durante el testeo en staging se detecta un problema, el fix va a `release/vX.Y.Z` directamente — nunca a `develop`.**
+**Si durante el testeo en testing se detecta un problema, el fix va a `release/vX.Y.Z` directamente — nunca a `develop`.**
 
 ```
 develop ──●──●──[start-release]──●──●──●──  ← próxima versión → testing

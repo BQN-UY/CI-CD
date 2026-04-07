@@ -31,6 +31,7 @@ jobs:
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          BRANCH="hotfix/${{ steps.semver.outputs.tag }}-${{ inputs.description }}"
+          DESCRIPTION=$(echo "${{ inputs.description }}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g' | sed 's/--*/-/g' | sed 's/^-//;s/-$//')
+          BRANCH="hotfix/${{ steps.semver.outputs.tag }}-${DESCRIPTION}"
           git checkout -b "$BRANCH"
           git push origin "$BRANCH"
