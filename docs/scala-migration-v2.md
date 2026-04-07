@@ -236,6 +236,26 @@ jobs:
           token:       ${{ secrets.DEPLOY_STAGING_TOKEN }}
 ```
 
+### Fixes durante el ciclo de release
+
+> **Cambio de comportamiento respecto a v1:** en v1 no se usaban ramas `release/**`
+> ni `develop`. Este es uno de los cambios más importantes a internalizar en v2.
+
+Una vez creada la rama `release/vX.Y.Z` con `start-release.yml`, esa rama y
+`develop` son **independientes**. Los commits que lleguen a `develop` después
+del `start-release` son para la **próxima versión** — no afectan el release en
+curso ni re-publican en staging.
+
+**Si se detecta un problema durante el testeo en staging, el fix se commitea
+directamente sobre `release/vX.Y.Z` — nunca sobre `develop`.**
+
+El push a `release/vX.Y.Z` dispara `publish-and-deploy.yml` automáticamente:
+publica el snapshot en Nexus y redespliega staging. Una vez validado,
+`make-release.yml` cierra el ciclo: crea el tag, publica en Nexus releases,
+mergea a main y hace back-merge a develop (así los fixes vuelven a develop al final).
+
+---
+
 ### `start-release.yml`
 
 ```yaml

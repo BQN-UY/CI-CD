@@ -377,6 +377,40 @@ Pasos:
   8. shared/deploy-trigger          → deploy a production
 ```
 
+#### Fixes durante el ciclo de release — cambio de comportamiento respecto a v1
+
+> **Diferencia clave con v1:** En v1 no se usaban ramas `release/**` ni `develop`.
+> En v2 este flujo cambia y es importante internalizarlo.
+
+Una vez ejecutado `start-release.yml`, la rama `release/vX.Y.Z` y `develop` son
+**independientes**. Los cambios que se pusheen a `develop` después de ese punto
+son para la **próxima versión** — no se incluyen en el release en curso ni
+re-publican en staging.
+
+**Si durante el testeo en staging se detecta un problema, el fix va a `release/vX.Y.Z` directamente — nunca a `develop`.**
+
+```
+develop ──●──●──[start-release]──●──●──●──  ← próxima versión, solo va a testing
+                      │
+          release/vX.Y.Z ──[fix]──[fix]──   ← fixes del release actual → staging
+                                    │
+                              make-release → production
+                                    │
+                              back-merge → develop  ← los fixes vuelven aquí al final
+```
+
+El ciclo completo de un fix en release:
+
+```
+1. Commit del fix directo en release/vX.Y.Z  (o PR hacia release/vX.Y.Z)
+2. push → publish-and-deploy.yml             → snapshot Nexus + deploy staging
+3. Validar en staging
+4. Si OK → make-release.yml                  → tag + Nexus release + GitHub Release
+                                             → merge release → main
+                                             → back-merge main → develop
+                                             → deploy production
+```
+
 #### `start-hotfix.yml` — crea la hotfix branch
 
 ```
