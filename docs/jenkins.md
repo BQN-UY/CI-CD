@@ -195,7 +195,7 @@ Además de los jobs, se requiere tener configurado:
 
 | Item | Descripción |
 |---|---|
-| Plugin **Generic Webhook Trigger** | Instalado en la instancia Jenkins |
+| Plugin **Generic Webhook Trigger** 2.4.1 | ✅ Ya instalado |
 | Credencial `nexus_deploy` | Usuario/password para descargar artefactos desde Nexus |
 | Credencial `github_pat_jenkins` | PAT GitHub read-only (`contents`) para leer `config/sistemas.json` |
 | `config/sistemas.json` | Archivo en el repo Jenkins con la lista de sistemas y sus instalaciones por ambiente. Los Active Choice dropdowns lo leen via GitHub API. |
