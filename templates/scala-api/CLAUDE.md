@@ -22,8 +22,8 @@ Este proyecto usa CI/CD v2 de BQN-UY. Las actions reutilizables viven en
 | `hotfix/**` | snapshots | staging | Fix urgente — espejo de producción |
 | `make-release` | **releases** | production | Versión definitiva e irreversible |
 
-- **testing**: todo lo que está en desarrollo para la próxima versión. Nunca mezcla con producción.
-- **staging**: espejo de producción, exclusivo para validar hotfixes.
+- **testing**: ambiente compartido por `develop` y `release/**`. Nunca mezcla con producción, pero un push a `develop` puede pisar un deploy de `release/**` que esté siendo validado. Congelar merges a `develop` mientras se valida un release.
+- **staging**: espejo de producción, exclusivo para validar hotfixes. Nunca comparte estado con testing.
 - **production**: solo vía `make-release` manual. Crea tag Git, publica en Nexus releases, crea GitHub Release, mergea a main y hace back-merge a develop.
 
 ## Reglas críticas

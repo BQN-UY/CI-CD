@@ -461,7 +461,7 @@ Jobs: verify-label + lint-build (html-js) + security
 #### `publish-and-deploy.yml`
 El snapshot del frontend es el artefacto `/dist` guardado en GitHub Actions Artifacts
 (no en Nexus). Si hay CDN o storage propio, se agrega un paso de upload.
-Después del upload, se dispara `shared/deploy-trigger`: `environment: testing` si la rama es `develop`, `environment: staging` si la rama es `hotfix/**`.
+Después del upload, se dispara `shared/deploy-trigger`: `environment: testing` si la rama es `develop` o `release/**`, `environment: staging` si la rama es `hotfix/**`.
 
 #### `make-release.yml`
 ```
@@ -492,7 +492,7 @@ Registry), equivalente a los maven-snapshots del stack Scala.
 Tag de imagen: ghcr.io/bqn-uy/{repo}:{github.sha}
 ```
 
-Después de publicar la imagen, se dispara `shared/deploy-trigger`: `environment: testing` si la rama es `develop`, `environment: staging` si la rama es `hotfix/**`.
+Después de publicar la imagen, se dispara `shared/deploy-trigger`: `environment: testing` si la rama es `develop` o `release/**`, `environment: staging` si la rama es `hotfix/**`.
 
 #### `make-release.yml`
 ```

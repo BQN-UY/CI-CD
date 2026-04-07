@@ -15,21 +15,25 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Validate environment
+    - name: Trigger deploy
       shell: bash
       run: |
-        case "${{ inputs.environment }}" in
+        # Normalizar alias obsoleto
+        ENV="${{ inputs.environment }}"
+        if [ "$ENV" = "dev" ]; then
+          echo "Warning: 'dev' es un alias obsoleto — usar 'testing'. El valor se normaliza a 'testing'." >&2
+          ENV="testing"
+        fi
+
+        # Validar ambiente
+        case "$ENV" in
           testing|staging|production) ;;
-          dev) echo "Warning: 'dev' es un alias obsoleto — usar 'testing'." >&2 ;;
           *)
-            echo "Error: invalid environment '${{ inputs.environment }}'. Expected one of: testing, staging, production." >&2
+            echo "Error: invalid environment '$ENV'. Expected one of: testing, staging, production." >&2
             exit 1
             ;;
         esac
 
-    - name: Trigger deploy
-      shell: bash
-      run: |
         # No usar --retry-all-errors en POST para evitar múltiples deploys
         # ante timeouts o errores 5xx en webhooks no idempotentes.
         # Solo se reintenta ante errores de conexión (--retry maneja CURLE_* codes).
@@ -41,11 +45,11 @@ runs:
           -X POST "${{ inputs.service-url }}" \
           -H "Authorization: Bearer ${{ inputs.token }}" \
           -H "Content-Type: application/json" \
-          -d '{
-            "environment": "${{ inputs.environment }}",
-            "ref": "${{ github.sha }}",
-            "actor": "${{ github.actor }}"
-          }')
+          -d "{
+            \"environment\": \"$ENV\",
+            \"ref\": \"${{ github.sha }}\",
+            \"actor\": \"${{ github.actor }}\"
+          }")
         if [ "$HTTP_STATUS" != "200" ] && [ "$HTTP_STATUS" != "204" ]; then
           echo "Webhook failed — HTTP $HTTP_STATUS" >&2
           echo "Response body: $(cat "$RESPONSE_BODY" | head -c 500)" >&2

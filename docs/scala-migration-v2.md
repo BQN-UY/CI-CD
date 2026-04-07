@@ -243,8 +243,12 @@ jobs:
 
 Una vez creada la rama `release/vX.Y.Z` con `start-release.yml`, esa rama y
 `develop` son **independientes**. Los commits que lleguen a `develop` después
-del `start-release` son para la **próxima versión** — no afectan el release en
-curso ni re-publican en testing.
+del `start-release` son para la **próxima versión**: no modifican la rama de
+release ni el contenido del release en curso, aunque `publish-and-deploy.yml`
+siga desplegando a `testing` en cada push a `develop`. Como `develop` y
+`release/**` comparten el mismo ambiente `testing`, un push a `develop` durante
+una validación de release **puede pisar el deploy que se está validando**.
+Para evitarlo, congelar merges a `develop` mientras se valida el release en `testing`.
 
 **Si se detecta un problema durante el testeo en testing, el fix se commitea
 directamente sobre `release/vX.Y.Z` — nunca sobre `develop`.**

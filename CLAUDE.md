@@ -19,7 +19,8 @@ docs/                 ← documentación de referencia v2
 
 ## Reglas
 
-- Solo modificar `.github/actions/`, `templates/` y `docs/`
+- Modificar normalmente solo `.github/actions/`, `templates/` y `docs/`
+- Excepciones permitidas en raíz y `.github/`: `CLAUDE.md`, `.github/copilot-instructions.md` y archivos de configuración del repo
 - NUNCA modificar `.github/workflows/` — son workflows v1 legacy, no se migran
 - Los workflows de cada proyecto NO viven aquí — viven en el repo del proyecto
 - Toda nueva action v2 va en `.github/actions/<capa>/<stack>/<nombre>/action.yml`

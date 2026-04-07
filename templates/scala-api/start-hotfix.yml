@@ -32,6 +32,10 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           DESCRIPTION=$(echo "${{ inputs.description }}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g' | sed 's/--*/-/g' | sed 's/^-//;s/-$//')
+          if [ -z "$DESCRIPTION" ]; then
+            echo "Error: description quedó vacía tras sanitizar. Usar solo letras, números y guiones." >&2
+            exit 1
+          fi
           BRANCH="hotfix/${{ steps.semver.outputs.tag }}-${DESCRIPTION}"
           git checkout -b "$BRANCH"
           git push origin "$BRANCH"
