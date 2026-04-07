@@ -206,10 +206,12 @@ No requiere inputs — opera sobre el checkout actual. Para que el upload de SAR
 
 ### 3.4 `shared/semver-tag`
 
-Calcula el próximo tag SemVer 2.0 leyendo el historial de Git y crea un tag anotado (no firmado con GPG).
-El tipo de bump (`major` / `minor` / `patch`) lo elige el desarrollador al disparar
-`make-release`. Si se requieren tags firmados con GPG, el manejo de claves y la firma
-deben implementarse en el workflow que invoca esta action.
+Crea un tag SemVer 2.0 anotado (no firmado con GPG). Soporta dos modos:
+
+- **Modo `bump`** (usado en `start-release` y `start-hotfix`): calcula la próxima versión leyendo el tag más reciente en el historial Git e incrementando según `major`/`minor`/`patch`.
+- **Modo `tag`** (usado en `make-release`): recibe el tag exacto a crear, derivado del nombre de la rama (`release/vX.Y.Z` o `hotfix/vX.Y.Z-desc`). Garantiza que el tag coincide con la versión indicada en la rama.
+
+Si se requieren tags firmados con GPG, el manejo de claves y la firma deben implementarse en el workflow que invoca esta action.
 
 > **Permisos requeridos:** esta action hace push de tags al repositorio remoto. El workflow
 > que la use debe declarar `permissions: contents: write` (o utilizar un PAT con permisos
@@ -219,7 +221,8 @@ deben implementarse en el workflow que invoca esta action.
 
 | Input | Descripción | Default |
 |---|---|---|
-| `bump` | `major` \| `minor` \| `patch` | `minor` |
+| `bump` | `major` \| `minor` \| `patch` — ignorado si se usa `tag` | `minor` |
+| `tag` | Tag exacto a crear (ej. `v1.3.0`). Si se provee, omite el cálculo de bump. | — |
 | `prefix` | Prefijo del tag | `v` |
 | `dry-run` | Solo calcula, no crea el tag | `false` |
 
@@ -367,18 +370,18 @@ Pasos:
 #### `make-release.yml` — hace el release completo a production
 
 ```
-Trigger: workflow_dispatch
-Input:   bump (major | minor | patch)
+Trigger: workflow_dispatch (ejecutar desde rama release/vX.Y.Z o hotfix/vX.Y.Z-desc)
 
 Pasos:
   1. backend/scala/lint-build
   2. shared/security-scan
-  3. shared/semver-tag              → crea el tag Git
-  4. sbt publish                    → publica JAR release en Nexus maven-releases
-  5. shared/github-release          → crea GitHub Release con notas
-  6. shared/git-merge               → merge release → main
-  7. shared/git-merge               → back-merge main → develop
-  8. shared/deploy-trigger          → deploy a production
+  3. Extraer versión desde nombre de rama (release/vX.Y.Z → vX.Y.Z)
+  4. shared/semver-tag (tag: vX.Y.Z) → crea el tag Git exacto
+  5. sbt publish                    → publica JAR release en Nexus maven-releases
+  6. shared/github-release          → crea GitHub Release con notas
+  7. shared/git-merge               → merge release → main
+  8. shared/git-merge               → back-merge main → develop
+  9. shared/deploy-trigger          → deploy a production
 ```
 
 #### Fixes durante el ciclo de release — cambio de comportamiento respecto a v1
@@ -591,8 +594,8 @@ sequenceDiagram
     GHA->>NX: publish snapshot JAR/WAR
     GHA->>JNK: POST webhook — env: staging
 
-    Note over DEV,JNK: make-release.yml (workflow_dispatch)
-    DEV->>GHA: trigger manual (bump)
+    Note over DEV,JNK: make-release.yml (workflow_dispatch desde release/** o hotfix/**)
+    DEV->>GHA: trigger manual
     GHA->>NX: publish release JAR/WAR
     GHA->>JNK: POST webhook — env: production
 ```

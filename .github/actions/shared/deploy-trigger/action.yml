@@ -41,6 +41,11 @@ runs:
       run: |
         set -euo pipefail
 
+        if ! command -v jq &>/dev/null; then
+          echo "Error: jq is required but not installed. Add a 'sudo apt-get install -y jq' step before this action." >&2
+          exit 1
+        fi
+
         case "$ENV" in
           testing|staging|production) ;;
           *)
