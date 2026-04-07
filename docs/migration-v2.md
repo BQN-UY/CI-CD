@@ -511,6 +511,19 @@ Pasos:
 
 ## 6. Resumen comparativo de stacks
 
+### Semántica de ambientes
+
+| Rama | Nexus | Ambiente | Propósito |
+|---|---|---|---|
+| `develop` | snapshots | testing | Features de la próxima versión |
+| `release/**` | snapshots | testing | Fixes del release en curso |
+| `hotfix/**` | snapshots | staging | Fix urgente a producción |
+| `make-release` | **releases** | production | Versión definitiva |
+
+- **testing** — todo lo que está siendo desarrollado o corregido para la próxima versión. Nunca se mezcla con fixes de producción.
+- **staging** — espejo de producción, exclusivo para validar hotfixes antes de aplicarlos. Siempre refleja un estado cercano a lo que hay en producción.
+- **production** — único deploy irreversible, solo vía `make-release` manual.
+
 ### Actions y environments
 
 ```mermaid
