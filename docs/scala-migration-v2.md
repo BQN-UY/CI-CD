@@ -406,8 +406,11 @@ on:
 
 jobs:
   start-hotfix:
+    # main == último tag de release: make-release siempre mergea a main y crea
+    # el tag en ese mismo commit. Partir de main es partir del estado de producción.
     name: Crear hotfix branch desde main
     runs-on: ubuntu-latest
+    if: github.ref_name == 'main'
     steps:
       - uses: actions/checkout@v4
         with:

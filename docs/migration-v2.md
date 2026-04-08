@@ -424,7 +424,9 @@ El ciclo completo de un fix en release:
 #### `start-hotfix.yml` — crea la hotfix branch
 
 ```
-Trigger: workflow_dispatch
+Trigger: workflow_dispatch (siempre opera sobre main — guard if: github.ref_name == 'main')
+         main == último tag de release: make-release siempre mergea a main y crea el tag
+         en ese mismo commit, por lo que partir de main es partir del estado de producción.
 Input:   description (ej. "fix-null-parser")
 
 Pasos:
