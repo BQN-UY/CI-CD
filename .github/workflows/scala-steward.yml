@@ -1,34 +1,43 @@
 name: Scala Steward — dependencias internas
 
 # Actualiza dependencias com.bqn y com.zistemas en todos los repos de la org.
+# El scope está restringido por el .scala-steward.conf de cada proyecto.
 # Las dependencias públicas (Maven Central) son responsabilidad de Dependabot.
 #
-# Cuenta de servicio: bqn-sysadmin (PAT almacenado en SCALA_STEWARD_GITHUB_TOKEN)
+# Cuenta de servicio: bqn-sysadmin vía SYSADMIN_PAT (org secret, ya configurado)
 #
-# Requisitos:
-#   SCALA_STEWARD_GITHUB_TOKEN — org secret — PAT de bqn-sysadmin con scope: repo
-#   NEXUS_USER                 — org secret — usuario Nexus (acceso de lectura)
-#   NEXUS_PASSWORD             — org secret — contraseña Nexus
-#   vars.NEXUS_URL             — org variable — URL base del Nexus privado (no es secret)
+# Requisitos org-level:
+#   SYSADMIN_PAT   — secret  — PAT de bqn-sysadmin con scope: repo
+#   NEXUS_USER     — secret  — usuario Nexus (acceso de lectura es suficiente)
+#   NEXUS_PASSWORD — secret  — contraseña Nexus
+#   vars.NEXUS_URL — variable — URL base del Nexus privado (no es secret)
 
 on:
   schedule:
-    - cron: "0 7 * * 1"   # cada lunes a las 7:00 UTC
-  workflow_dispatch:        # permite ejecución manual
+    - cron: "0 9 1,12,23 * *"  # días 1, 12 y 23 de cada mes a las 9:00 UTC (6:00 MVD)
+  workflow_dispatch:
 
 jobs:
   scala-steward:
     name: Actualizar dependencias internas
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "11"
+
       - uses: scala-steward-org/scala-steward-action@v2
         with:
-          github-token:     ${{ secrets.SCALA_STEWARD_GITHUB_TOKEN }}
-          repos-file:       scala-steward/repos.md
-          branches:         develop
-          labels:           update
-          sign-commits:     "false"
+          github-token:   ${{ secrets.SYSADMIN_PAT }}
+          repos-file:     scala-steward/repos.md
+          branches:       develop
+          labels:         update
+          author-name:    Scala Steward
+          author-email:   scala-steward@users.noreply.github.com
+          sign-commits:   "false"
           coursier-credentials: |
             ${{ vars.NEXUS_URL }} realm=Sonatype Nexus Repository Manager username=${{ secrets.NEXUS_USER }} password=${{ secrets.NEXUS_PASSWORD }}

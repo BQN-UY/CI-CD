@@ -812,7 +812,7 @@ Scala Steward corre centralmente en este repo (`BQN-UY/CI-CD`) via
 
 | Nombre | Tipo | Descripción |
 |---|---|---|
-| `SCALA_STEWARD_GITHUB_TOKEN` | secret | PAT de `bqn-sysadmin` con scope `repo` — crea ramas y PRs en repos de la org |
+| `SYSADMIN_PAT` | secret | PAT de `bqn-sysadmin` — ya existe org-level, scope `repo` |
 | `NEXUS_USER` | secret | Usuario Nexus — ya existe org-level, acceso de lectura es suficiente |
 | `NEXUS_PASSWORD` | secret | Contraseña Nexus — ya existe org-level |
 | `vars.NEXUS_URL` | variable | URL base del Nexus — no es secret, ya existe org-level |
