@@ -1,11 +1,13 @@
 # Repositorios gestionados por Scala Steward
 
-Scala Steward actualiza **solo dependencias internas** (`com.bqn`, `com.zistemas`) en estos repos.
-El scope está restringido por el `.scala-steward.conf` de cada proyecto.
-Las dependencias públicas son responsabilidad de Dependabot (configurado en cada repo).
+**Runner actual:** `BQN-UY/scala-steward-action` — no modificar hasta resolver el flujo v2 de librerías.
 
-Para agregar un repo: agregar la línea en la sección y nivel correspondiente,
-y asegurarse de que el repo tenga `.scala-steward.conf` copiado desde `templates/scala-api/`.
+Este archivo es material de referencia y planificación para la futura migración del runner.
+Cuando se migre, el workflow nuevo se agregará a `scala-steward-action` sin tocar los existentes.
+
+Lista consolidada de repos + niveles de librerías para usar como base cuando se haga la migración.
+Las dependencias públicas son responsabilidad de Dependabot (configurado en cada repo).
+El scope de deps internas estará restringido por el `.scala-steward.conf` de cada proyecto (`com.bqn`, `com.zistemas`).
 
 ---
 
