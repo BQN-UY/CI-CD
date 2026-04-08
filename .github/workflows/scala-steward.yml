@@ -28,7 +28,7 @@ jobs:
           github-token:     ${{ secrets.SCALA_STEWARD_GITHUB_TOKEN }}
           repos-file:       scala-steward/repos.md
           branches:         develop
-          labels:           deps
+          labels:           update
           sign-commits:     "false"
           coursier-credentials: |
             ${{ vars.NEXUS_URL }} realm=Sonatype Nexus Repository Manager username=${{ secrets.NEXUS_USER }} password=${{ secrets.NEXUS_PASSWORD }}

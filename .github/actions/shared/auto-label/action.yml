@@ -37,9 +37,9 @@ runs:
             'refactor/':       'chore',
             'hotfix/':         'fix',
             'release/':        'deploy-action',
-            'dependabot/':     'deps',
-            'scala-steward/':  'deps',
-            'update/':         'deps',   // prefijo default de Scala Steward
+            'dependabot/':     'update',
+            'scala-steward/':  'update',
+            'update/':         'update',  // prefijo default de Scala Steward
           };
           const managedLabels = new Set(Object.values(map));
           const owner = context.repo.owner;

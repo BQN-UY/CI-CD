@@ -14,15 +14,15 @@ Este proyecto usa CI/CD v2 de BQN-UY. Las actions reutilizables viven en
 | `chore/*` | `develop` | `develop` | `chore` | Mantenimiento: configuración, CI, tests |
 | `docs/*` | `develop` | `develop` | `chore` | Documentación |
 | `refactor/*` | `develop` | `develop` | `chore` | Refactoring sin cambio de comportamiento |
-| `dependabot/*` | `develop` | `develop` | `deps` | Actualización de dependencias (Dependabot) |
-| `scala-steward/*` | `develop` | `develop` | `deps` | Actualización de dependencias (Scala Steward) |
+| `dependabot/*` | `develop` | `develop` | `update` | Actualización de dependencias (Dependabot) |
+| `scala-steward/*` | `develop` | `develop` | `update` | Actualización de dependencias (Scala Steward) |
 
 > `fix/*` es el único tipo que puede salir de una rama distinta a `develop`.
 > Un `fix/*` desde `release/**` corrige un bug detectado durante el testeo del RC.
 > Un `fix/*` desde `hotfix/**` corrige un bug secundario descubierto dentro del hotfix.
 >
 > `dependabot/*` y `scala-steward/*` son creadas automáticamente por las herramientas — no crearlas manualmente.
-> `auto-label` les asigna `deps` automáticamente; Dependabot también se configura con `labels: ["deps"]` en `.github/dependabot.yml`.
+> `auto-label` les asigna `update` automáticamente; Dependabot también se configura con `labels: ["update"]` en `.github/dependabot.yml`.
 
 ### Ramas de ciclo (larga duración — gestionadas por workflows)
 

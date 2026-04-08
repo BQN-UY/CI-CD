@@ -32,8 +32,8 @@ disparar cada workflow.
 | `chore/*` | `develop` | `develop` | `chore` | Mantenimiento: configuración, CI, tests |
 | `docs/*` | `develop` | `develop` | `chore` | Documentación |
 | `refactor/*` | `develop` | `develop` | `chore` | Refactoring sin cambio de comportamiento |
-| `dependabot/*` | `develop` | `develop` | `deps` | Actualización de dependencias (Dependabot) |
-| `scala-steward/*` | `develop` | `develop` | `deps` | Actualización de dependencias (Scala Steward) |
+| `dependabot/*` | `develop` | `develop` | `update` | Actualización de dependencias (Dependabot) |
+| `scala-steward/*` | `develop` | `develop` | `update` | Actualización de dependencias (Scala Steward) |
 
 > `fix/*` es el único tipo que puede salir de una rama distinta a `develop`.
 > Un `fix/*` desde `release/**` corrige un bug del RC; PR hacia `release/vX.Y.Z`, nunca hacia `develop`.
@@ -637,14 +637,14 @@ sequenceDiagram
 | `feature` | `feat:` | MINOR (`1.2.3 → 1.3.0`) | `auto-label` / manual |
 | `fix` | `fix:` | PATCH (`1.2.3 → 1.2.4`) | `auto-label` / manual |
 | `chore` | `chore:`, `docs:`, `refactor:` | PATCH | `auto-label` / manual |
-| `deps` | `chore(deps):` | PATCH | `auto-label` (Dependabot/Scala Steward) |
+| `update` | `chore(update):` | PATCH | `auto-label` (Dependabot/Scala Steward) |
 | `deploy-action` | Cualquiera + infra requerida | Independiente del bump | `auto-label` (`release/`) / manual |
 
-> **`deps`:** label exclusivo para actualizaciones de dependencias generadas por Dependabot
+> **`update`:** label exclusivo para actualizaciones de dependencias generadas por Dependabot
 > o Scala Steward. Separado de `chore` para que el changelog identifique claramente
 > las actualizaciones de libs. `auto-label` lo asigna automáticamente para ramas
 > `dependabot/*` y `scala-steward/*`. Ambas herramientas deben configurarse con
-> `target-branch: develop` y `labels: ["deps"]`.
+> `target-branch: develop` y `labels: ["update"]`.
 
 > **`deploy-action`:** el PR requiere una acción manual en la infraestructura antes
 > o durante el deploy — por ejemplo: nueva variable de entorno, migración de base de
@@ -699,7 +699,7 @@ Guía al desarrollador para completar la información del PR y asignar el label 
 - [ ] `fix`              — corrección de bug retrocompatible
 - [ ] `breaking-change`  — rompe compatibilidad de API
 - [ ] `chore`            — refactor, configuración, CI, tests
-- [ ] `deps`             — actualización de dependencias (Dependabot / Scala Steward)
+- [ ] `update`             — actualización de dependencias (Dependabot / Scala Steward)
 - [ ] `deploy-action`    — requiere acción manual en infra antes/durante el deploy
 
 ## Deploy action requerida
@@ -764,7 +764,7 @@ updates:
       interval: "weekly"
     target-branch: "develop"
     labels:
-      - "deps"
+      - "update"
     open-pull-requests-limit: 5
     ignore:
       - dependency-name: "com.bqn:*"
@@ -777,7 +777,7 @@ updates:
       interval: "weekly"
     target-branch: "develop"
     labels:
-      - "deps"
+      - "update"
     open-pull-requests-limit: 5
 ```
 
@@ -792,7 +792,7 @@ updates.allow = [
 ]
 
 updatePullRequests = "always"
-commits.message = "chore(deps): update ${artifactName} ${currentVersion} → ${nextVersion}"
+commits.message = "chore(update): update ${artifactName} ${currentVersion} → ${nextVersion}"
 updates.includeScala = false
 updates.ignore = [
   { groupId = "org.scala-lang", artifactId = "scala-library" }

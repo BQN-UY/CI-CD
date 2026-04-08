@@ -16,8 +16,8 @@ directamente en los workflows — todo se delega a actions de `BQN-UY/CI-CD`.
 | `chore/*` | `develop` | `develop` | `chore` | Configuración, CI, tests |
 | `docs/*` | `develop` | `develop` | `chore` | Documentación |
 | `refactor/*` | `develop` | `develop` | `chore` | Refactoring sin cambio de comportamiento |
-| `dependabot/*` | `develop` | `develop` | `deps` | Actualización de deps (Dependabot) |
-| `scala-steward/*` | `develop` | `develop` | `deps` | Actualización de deps (Scala Steward) |
+| `dependabot/*` | `develop` | `develop` | `update` | Actualización de deps (Dependabot) |
+| `scala-steward/*` | `develop` | `develop` | `update` | Actualización de deps (Scala Steward) |
 
 ### Ramas de ciclo
 
