@@ -1,0 +1,10 @@
+version: 2
+updates:
+  - package-ecosystem: "sbt"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    target-branch: "develop"   # siempre hacia develop — nunca release/** ni hotfix/**
+    labels:
+      - "deps"                 # satisface label-check; auto-label también lo cubre por el prefijo dependabot/
+    open-pull-requests-limit: 5

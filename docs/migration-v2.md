@@ -29,13 +29,18 @@ disparar cada workflow.
 |---|---|---|---|---|
 | `feature/*` | `develop` | `develop` | `feature` | Nueva funcionalidad retrocompatible |
 | `fix/*` | `develop` · `release/**` · `hotfix/**` | mismo origen | `fix` | Corrección de bug |
-| `chore/*` | `develop` | `develop` | `chore` | Mantenimiento: deps, configuración, CI |
+| `chore/*` | `develop` | `develop` | `chore` | Mantenimiento: configuración, CI, tests |
 | `docs/*` | `develop` | `develop` | `chore` | Documentación |
 | `refactor/*` | `develop` | `develop` | `chore` | Refactoring sin cambio de comportamiento |
+| `dependabot/*` | `develop` | `develop` | `deps` | Actualización de dependencias (Dependabot) |
+| `scala-steward/*` | `develop` | `develop` | `deps` | Actualización de dependencias (Scala Steward) |
 
 > `fix/*` es el único tipo que puede salir de una rama distinta a `develop`.
 > Un `fix/*` desde `release/**` corrige un bug del RC; PR hacia `release/vX.Y.Z`, nunca hacia `develop`.
 > Un `fix/*` desde `hotfix/**` corrige un bug secundario del hotfix; PR hacia `hotfix/vX.Y.Z-desc`.
+>
+> `dependabot/*` y `scala-steward/*` son creadas automáticamente por las herramientas.
+> Nunca apuntan a `release/**` ni `hotfix/**` — las actualizaciones de deps en esos contextos son excepcionales y se hacen manualmente como `fix/*` si son críticas.
 
 #### Ramas de ciclo (larga duración — gestionadas por workflows)
 
@@ -626,18 +631,34 @@ sequenceDiagram
 
 ### Conventional Commits y labels de PR
 
-| Label PR | Tipo de commit | Bump SemVer sugerido |
-|---|---|---|
-| `breaking-change` | `feat(scope)!` o `fix!` | MAJOR (`1.2.3 → 2.0.0`) |
-| `feature` | `feat:` | MINOR (`1.2.3 → 1.3.0`) |
-| `fix` | `fix:` | PATCH (`1.2.3 → 1.2.4`) |
-| `chore` | `chore:`, `docs:`, `refactor:` | PATCH |
-| `deploy-action` | Cualquiera + infra requerida | Independiente del bump |
+| Label PR | Tipo de commit | Bump SemVer sugerido | Asignado por |
+|---|---|---|---|
+| `breaking-change` | `feat(scope)!` o `fix!` | MAJOR (`1.2.3 → 2.0.0`) | Manual |
+| `feature` | `feat:` | MINOR (`1.2.3 → 1.3.0`) | `auto-label` / manual |
+| `fix` | `fix:` | PATCH (`1.2.3 → 1.2.4`) | `auto-label` / manual |
+| `chore` | `chore:`, `docs:`, `refactor:` | PATCH | `auto-label` / manual |
+| `deps` | `chore(deps):` | PATCH | `auto-label` (Dependabot/Scala Steward) |
+| `deploy-action` | Cualquiera + infra requerida | Independiente del bump | `auto-label` (`release/`) / manual |
 
-> **`breaking-change` vs `deploy-action`:** `breaking-change` habla de compatibilidad
-> de API — los consumidores deben actualizar su código. `deploy-action` habla de
-> requisitos de infraestructura — el ambiente necesita preparación antes del deploy.
-> Son dimensiones independientes y pueden coexistir en el mismo PR.
+> **`deps`:** label exclusivo para actualizaciones de dependencias generadas por Dependabot
+> o Scala Steward. Separado de `chore` para que el changelog identifique claramente
+> las actualizaciones de libs. `auto-label` lo asigna automáticamente para ramas
+> `dependabot/*` y `scala-steward/*`. Ambas herramientas deben configurarse con
+> `target-branch: develop` y `labels: ["deps"]`.
+
+> **`deploy-action`:** el PR requiere una acción manual en la infraestructura antes
+> o durante el deploy — por ejemplo: nueva variable de entorno, migración de base de
+> datos, nuevo secret, nuevo componente de infra (queue, bucket, etc.).
+> Reemplaza al label de tipo (`feature`, `fix`, etc.) — el tipo de cambio se describe
+> en el cuerpo del PR y la acción requerida en la sección "Deploy action requerida"
+> del PR template. Es el label más crítico del flujo: mergear sin ejecutar la acción
+> previa puede romper el ambiente.
+
+> **`breaking-change` vs `deploy-action`:** son dimensiones distintas.
+> `breaking-change` = los consumidores de la API deben actualizar su código.
+> `deploy-action` = el ambiente necesita preparación antes del deploy.
+> No pueden coexistir como labels (label-check exige exactamente uno) — si un PR
+> es ambos, usar `deploy-action` y documentar el breaking change en el cuerpo del PR.
 
 ---
 
@@ -677,8 +698,9 @@ Guía al desarrollador para completar la información del PR y asignar el label 
 - [ ] `feature`          — nueva funcionalidad retrocompatible
 - [ ] `fix`              — corrección de bug retrocompatible
 - [ ] `breaking-change`  — rompe compatibilidad de API
-- [ ] `chore`            — refactor, deps, docs, tests
-- [ ] `deploy-action`    — requiere acción previa en el ambiente
+- [ ] `chore`            — refactor, configuración, CI, tests
+- [ ] `deps`             — actualización de dependencias (Dependabot / Scala Steward)
+- [ ] `deploy-action`    — requiere acción manual en infra antes/durante el deploy
 
 ## Deploy action requerida
 <!-- Si marcaste deploy-action, describir exactamente qué debe hacerse -->
@@ -717,7 +739,41 @@ Ambos archivos cubren:
 > estos archivos garantizan que el asistente opere con el mismo modelo mental
 > que el equipo — sin alucinaciones sobre el flujo de trabajo.
 
-### 8.3 `.github/labeler.yml`
+### 8.3 `.github/dependabot.yml`
+
+Configura Dependabot para que sus PRs apunten a `develop` y usen el label `deps`.
+El template está en `templates/scala-api/.github/dependabot.yml`.
+
+```yaml
+version: 2
+updates:
+  - package-ecosystem: "sbt"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    target-branch: "develop"   # siempre hacia develop — nunca release/** ni hotfix/**
+    labels:
+      - "deps"                 # satisface label-check; auto-label también lo cubre
+    open-pull-requests-limit: 5
+```
+
+**Scala Steward** se configura con los mismos principios: `base-branch: develop` y
+`labels: ["deps"]`. Si se usa el action oficial:
+
+```yaml
+- uses: scala-steward-org/scala-steward-action@v2
+  with:
+    github-token: ${{ secrets.GITHUB_TOKEN }}
+    branches: |
+      develop
+    labels: deps
+```
+
+> Ninguna herramienta de actualización de deps debe apuntar a `release/**` ni
+> `hotfix/**`. En esos contextos, una actualización de dep crítica se hace
+> manualmente como `fix/*` desde la rama correspondiente.
+
+### 8.4 `.github/labeler.yml`
 
 Aplica labels automáticamente según el nombre de la rama fuente del PR.
 
@@ -733,7 +789,13 @@ fix:
 
 chore:
   - head-branch: ["chore/.*", "docs/.*", "refactor/.*"]
+
+deps:
+  - head-branch: ["dependabot/.*", "scala-steward/.*"]
 ```
+
+> `shared/auto-label` cubre estos mismos patrones sin necesidad de `.github/labeler.yml`.
+> Usar `labeler.yml` solo si se necesitan reglas adicionales por archivos modificados.
 
 ---
 

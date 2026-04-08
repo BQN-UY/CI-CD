@@ -11,13 +11,18 @@ Este proyecto usa CI/CD v2 de BQN-UY. Las actions reutilizables viven en
 |---|---|---|---|---|
 | `feature/*` | `develop` | `develop` | `feature` | Nueva funcionalidad retrocompatible |
 | `fix/*` | `develop` · `release/**` · `hotfix/**` | mismo origen | `fix` | Corrección de bug |
-| `chore/*` | `develop` | `develop` | `chore` | Mantenimiento: deps, configuración, CI |
+| `chore/*` | `develop` | `develop` | `chore` | Mantenimiento: configuración, CI, tests |
 | `docs/*` | `develop` | `develop` | `chore` | Documentación |
 | `refactor/*` | `develop` | `develop` | `chore` | Refactoring sin cambio de comportamiento |
+| `dependabot/*` | `develop` | `develop` | `deps` | Actualización de dependencias (Dependabot) |
+| `scala-steward/*` | `develop` | `develop` | `deps` | Actualización de dependencias (Scala Steward) |
 
 > `fix/*` es el único tipo que puede salir de una rama distinta a `develop`.
 > Un `fix/*` desde `release/**` corrige un bug detectado durante el testeo del RC.
 > Un `fix/*` desde `hotfix/**` corrige un bug secundario descubierto dentro del hotfix.
+>
+> `dependabot/*` y `scala-steward/*` son creadas automáticamente por las herramientas — no crearlas manualmente.
+> `auto-label` les asigna `deps` automáticamente; Dependabot también se configura con `labels: ["deps"]` en `.github/dependabot.yml`.
 
 ### Ramas de ciclo (larga duración — gestionadas por workflows)
 
@@ -46,6 +51,8 @@ Este proyecto usa CI/CD v2 de BQN-UY. Las actions reutilizables viven en
 - `feature/*`, `chore/*`, `docs/*`, `refactor/*` salen **siempre** de `develop` — nunca de `release/**` ni `hotfix/**`
 - `fix/*` desde `release/**` → corrige un bug del RC en curso; PR hacia `release/vX.Y.Z`, **NUNCA hacia `develop`**
 - `fix/*` desde `hotfix/**` → corrige un bug secundario del hotfix; PR hacia `hotfix/vX.Y.Z-desc`
+- `dependabot/*` y `scala-steward/*` apuntan **siempre a `develop`** — nunca a `release/**` ni `hotfix/**`
+- `deploy-action` se usa cuando el PR requiere una acción manual en infra antes o durante el deploy (ej. nueva variable de entorno, migración de DB, nuevo secret, nuevo componente de infra). Reemplaza al label de tipo (`feature`, `fix`, etc.) — describir el tipo de cambio en el cuerpo del PR y la acción requerida en la sección "Deploy action requerida"
 - `develop` después de `start-release` → próxima versión, no afecta el release en curso
 - Los fixes de `release/**` vuelven a `develop` al final via back-merge automático de `make-release`
 - `hotfix/**` es exclusivo para fixes urgentes de la versión en producción — no mezclar con features
