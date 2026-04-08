@@ -505,6 +505,9 @@ actualizar esa referencia para que use la convención de sbt-dynver antes de mig
 [ ] Variable SISTEMA configurada en Settings → Variables → Actions del repo
 [ ] CLAUDE.md copiado desde templates/scala-api/CLAUDE.md
 [ ] .github/copilot-instructions.md copiado desde templates/scala-api/.github/copilot-instructions.md
+[ ] .github/dependabot.yml copiado desde templates/scala-api/.github/dependabot.yml
+[ ] .scala-steward.conf copiado desde templates/scala-api/.scala-steward.conf
+[ ] Repo agregado en BQN-UY/CI-CD scala-steward/repos.md
 [ ] PR abierto con label feature hacia develop
 [ ] CI pasa en la feature branch
 ```

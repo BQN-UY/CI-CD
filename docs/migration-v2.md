@@ -739,39 +739,86 @@ Ambos archivos cubren:
 > estos archivos garantizan que el asistente opere con el mismo modelo mental
 > que el equipo — sin alucinaciones sobre el flujo de trabajo.
 
-### 8.3 `.github/dependabot.yml`
+### 8.3 Herramientas de actualización de dependencias
 
-Configura Dependabot para que sus PRs apunten a `develop` y usen el label `deps`.
-El template está en `templates/scala-api/.github/dependabot.yml`.
+Las responsabilidades están divididas para evitar solapamiento y garantizar cobertura completa:
+
+| Herramienta | Scope | Configuración |
+|---|---|---|
+| **Dependabot** | Deps públicas (Maven Central, Sonatype) + GitHub Actions | Por repo — `.github/dependabot.yml` |
+| **Scala Steward** | Deps internas `com.bqn` y `com.zistemas` vía Nexus privado | Central — `BQN-UY/CI-CD` + `.scala-steward.conf` por repo |
+
+> Dependabot no puede acceder a repos Maven privados con autenticación — por eso
+> Scala Steward cubre las librerías internas.
+
+#### `.github/dependabot.yml` (por repo — template en `templates/scala-api/`)
 
 ```yaml
 version: 2
 updates:
+  # Dependencias públicas (Maven Central, Sonatype, etc.)
+  # Las dependencias internas com.bqn y com.zistemas son responsabilidad de Scala Steward.
   - package-ecosystem: "sbt"
     directory: "/"
     schedule:
       interval: "weekly"
-    target-branch: "develop"   # siempre hacia develop — nunca release/** ni hotfix/**
+    target-branch: "develop"
     labels:
-      - "deps"                 # satisface label-check; auto-label también lo cubre
+      - "deps"
+    open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: "com.bqn:*"
+      - dependency-name: "com.zistemas:*"
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    target-branch: "develop"
+    labels:
+      - "deps"
     open-pull-requests-limit: 5
 ```
 
-**Scala Steward** se configura con los mismos principios: `base-branch: develop` y
-`labels: ["deps"]`. Si se usa el action oficial:
+#### `.scala-steward.conf` (por repo — template en `templates/scala-api/`)
 
-```yaml
-- uses: scala-steward-org/scala-steward-action@v2
-  with:
-    github-token: ${{ secrets.GITHUB_TOKEN }}
-    branches: |
-      develop
-    labels: deps
+```hocon
+# Scala Steward gestiona SOLO dependencias internas de BQN-UY.
+# Las dependencias públicas (Maven Central, etc.) son responsabilidad de Dependabot.
+updates.allow = [
+  { groupId = "com.bqn" },
+  { groupId = "com.zistemas" }
+]
+
+updatePullRequests = "always"
+commits.message = "chore(deps): update ${artifactName} ${currentVersion} → ${nextVersion}"
+updates.includeScala = false
+updates.ignore = [
+  { groupId = "org.scala-lang", artifactId = "scala-library" }
+]
 ```
 
-> Ninguna herramienta de actualización de deps debe apuntar a `release/**` ni
-> `hotfix/**`. En esos contextos, una actualización de dep crítica se hace
-> manualmente como `fix/*` desde la rama correspondiente.
+#### Runner central de Scala Steward (en `BQN-UY/CI-CD`)
+
+Scala Steward corre centralmente en este repo (`BQN-UY/CI-CD`) via
+`.github/workflows/scala-steward.yml`. La lista de repos gestionados está en
+`scala-steward/repos.md`. Para agregar un nuevo repo al ciclo de actualizaciones:
+
+1. Copiar `.scala-steward.conf` desde `templates/scala-api/` al repo del proyecto
+2. Agregar `- BQN-UY/<nombre-repo>` en `scala-steward/repos.md`
+
+**Secrets requeridos (org-level):**
+
+| Secret | Descripción |
+|---|---|
+| `SCALA_STEWARD_GITHUB_TOKEN` | PAT con permisos `repo` + `workflow` (cuenta de servicio) |
+| `NEXUS_URL` | URL base del Nexus privado |
+| `NEXUS_USER` | Usuario con acceso de lectura a Nexus |
+| `NEXUS_PASSWORD` | Contraseña de Nexus |
+
+> Ninguna herramienta debe apuntar a `release/**` ni `hotfix/**`.
+> Una actualización de dep urgente en esos contextos se hace manualmente como `fix/*`.
 
 ### 8.4 `.github/labeler.yml`
 
