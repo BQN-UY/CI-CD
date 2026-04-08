@@ -5,13 +5,28 @@ Este proyecto usa CI/CD v2 de BQN-UY. Las actions reutilizables viven en
 
 ## Branching model
 
-| Rama | Propósito | Merge destino |
-|---|---|---|
-| `feature/*` | Nueva funcionalidad | `develop` via PR |
-| `develop` | Integración continua de la próxima versión | — |
-| `release/vX.Y.Z` | Estabilización del release candidate | `main` via make-release |
-| `hotfix/vX.Y.Z-desc` | Fix urgente a lo que está en producción | `main` via make-release |
-| `main` | Producción | — |
+### Ramas de trabajo (corta duración — siempre via PR)
+
+| Rama | Sale de | Merge hacia | Label PR | Cuándo usar |
+|---|---|---|---|---|
+| `feature/*` | `develop` | `develop` | `feature` | Nueva funcionalidad retrocompatible |
+| `fix/*` | `develop` · `release/**` · `hotfix/**` | mismo origen | `fix` | Corrección de bug |
+| `chore/*` | `develop` | `develop` | `chore` | Mantenimiento: deps, configuración, CI |
+| `docs/*` | `develop` | `develop` | `chore` | Documentación |
+| `refactor/*` | `develop` | `develop` | `chore` | Refactoring sin cambio de comportamiento |
+
+> `fix/*` es el único tipo que puede salir de una rama distinta a `develop`.
+> Un `fix/*` desde `release/**` corrige un bug detectado durante el testeo del RC.
+> Un `fix/*` desde `hotfix/**` corrige un bug secundario descubierto dentro del hotfix.
+
+### Ramas de ciclo (larga duración — gestionadas por workflows)
+
+| Rama | Sale de | Cierra con | Propósito |
+|---|---|---|---|
+| `develop` | — | — | Integración continua de la próxima versión |
+| `release/vX.Y.Z` | `develop` via `start-release` | `make-release` → `main` | Estabilización del RC |
+| `hotfix/vX.Y.Z-desc` | `main` via `start-hotfix` | `make-release` → `main` | Fix urgente a producción |
+| `main` | — | — | Producción |
 
 ## Semántica de ambientes
 
@@ -28,7 +43,9 @@ Este proyecto usa CI/CD v2 de BQN-UY. Las actions reutilizables viven en
 
 ## Reglas críticas
 
-- Fixes detectados en testing durante un release → commit en `release/vX.Y.Z`, **NUNCA en `develop`**
+- `feature/*`, `chore/*`, `docs/*`, `refactor/*` salen **siempre** de `develop` — nunca de `release/**` ni `hotfix/**`
+- `fix/*` desde `release/**` → corrige un bug del RC en curso; PR hacia `release/vX.Y.Z`, **NUNCA hacia `develop`**
+- `fix/*` desde `hotfix/**` → corrige un bug secundario del hotfix; PR hacia `hotfix/vX.Y.Z-desc`
 - `develop` después de `start-release` → próxima versión, no afecta el release en curso
 - Los fixes de `release/**` vuelven a `develop` al final via back-merge automático de `make-release`
 - `hotfix/**` es exclusivo para fixes urgentes de la versión en producción — no mezclar con features

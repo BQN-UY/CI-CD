@@ -157,7 +157,7 @@ name: CI
 
 on:
   pull_request:
-    branches: [develop]
+    branches: [develop, "release/**", "hotfix/**"]
   push:
     branches: ["release/**", "hotfix/**"]
 

@@ -23,16 +23,34 @@ disparar cada workflow.
 
 ### Branching model
 
+#### Ramas de trabajo (corta duración — siempre via PR)
+
+| Rama | Sale de | Merge hacia | Label PR | Cuándo usar |
+|---|---|---|---|---|
+| `feature/*` | `develop` | `develop` | `feature` | Nueva funcionalidad retrocompatible |
+| `fix/*` | `develop` · `release/**` · `hotfix/**` | mismo origen | `fix` | Corrección de bug |
+| `chore/*` | `develop` | `develop` | `chore` | Mantenimiento: deps, configuración, CI |
+| `docs/*` | `develop` | `develop` | `chore` | Documentación |
+| `refactor/*` | `develop` | `develop` | `chore` | Refactoring sin cambio de comportamiento |
+
+> `fix/*` es el único tipo que puede salir de una rama distinta a `develop`.
+> Un `fix/*` desde `release/**` corrige un bug del RC; PR hacia `release/vX.Y.Z`, nunca hacia `develop`.
+> Un `fix/*` desde `hotfix/**` corrige un bug secundario del hotfix; PR hacia `hotfix/vX.Y.Z-desc`.
+
+#### Ramas de ciclo (larga duración — gestionadas por workflows)
+
 ```mermaid
 flowchart LR
-    feat["feature/*"]
+    feat["feature/* · fix/*\nchore/* · docs/* · refactor/*"]
     develop(("develop"))
     release["release/vX.Y.Z"]
     hotfix["hotfix/vX.Y.Z-desc"]
+    fix_rc["fix/*"]
     main(("main"))
 
     feat -->|"PR → merge"| develop
     develop -->|"start-release\n(manual)"| release
+    fix_rc -->|"PR → merge"| release
     release -->|"make-release\n(manual)"| main
     main -.->|"back-merge\n(automático)"| develop
     main -->|"start-hotfix\n(manual)"| hotfix
@@ -333,7 +351,8 @@ no en CI-CD.
 #### `ci.yml` — se dispara en PRs y pushes a release/hotfix
 
 ```
-Trigger: PR → develop  |  push → release/** y hotfix/**
+Trigger: PR → develop · PR → release/** · PR → hotfix/**  |  push → release/** y hotfix/**
+         (cubre fix/* branches que apuntan a release/** o hotfix/**)
 
 Jobs:
   verify-label  → shared/label-check        (solo en PR)

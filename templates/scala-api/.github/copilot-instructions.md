@@ -7,16 +7,28 @@ directamente en los workflows — todo se delega a actions de `BQN-UY/CI-CD`.
 
 ## Branching model
 
-- `feature/*` → PR → `develop`
-- `develop` → próxima versión (deploy automático a **testing**)
-- `release/vX.Y.Z` → release candidate (deploy automático a **testing**)
-- `hotfix/vX.Y.Z-desc` → fix urgente a producción (deploy automático a **staging**)
-- `main` → producción (solo via `make-release`)
+### Ramas de trabajo (siempre via PR)
+
+| Rama | Sale de | Merge hacia | Cuándo usar |
+|---|---|---|---|
+| `feature/*` | `develop` | `develop` | Nueva funcionalidad |
+| `fix/*` | `develop` · `release/**` · `hotfix/**` | mismo origen | Corrección de bug |
+| `chore/*` | `develop` | `develop` | Deps, configuración, CI |
+| `docs/*` | `develop` | `develop` | Documentación |
+| `refactor/*` | `develop` | `develop` | Refactoring sin cambio de comportamiento |
+
+### Ramas de ciclo
+
+| Rama | Sale de | Cierra con |
+|---|---|---|
+| `release/vX.Y.Z` | `develop` via `start-release` | `make-release` → `main` |
+| `hotfix/vX.Y.Z-desc` | `main` via `start-hotfix` | `make-release` → `main` |
 
 ## Reglas de branching
 
-- Fixes durante un release → commit en `release/vX.Y.Z`, NUNCA en `develop`
-- `develop` después de `start-release` = próxima versión, no el release en curso
+- `feature/*`, `chore/*`, `docs/*`, `refactor/*` salen siempre de `develop`
+- `fix/*` es el único tipo que puede salir de `release/**` o `hotfix/**`
+- Fixes durante un release → `fix/*` desde `release/vX.Y.Z`, PR hacia `release/vX.Y.Z`, NUNCA hacia `develop`
 - `hotfix/**` = exclusivo para fixes de la versión en producción
 
 ## Ambientes
