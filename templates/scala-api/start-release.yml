@@ -14,6 +14,7 @@ jobs:
   start-release:
     name: Crear release branch
     runs-on: ubuntu-latest
+    if: github.ref_name == 'develop'
     permissions:
       contents: write             # requerido para crear y pushear la rama
     steps:

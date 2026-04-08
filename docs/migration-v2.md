@@ -357,7 +357,7 @@ Pasos:
 #### `start-release.yml` — crea la release branch
 
 ```
-Trigger: workflow_dispatch
+Trigger: workflow_dispatch (siempre opera sobre develop — guard if: github.ref_name == 'develop')
 Input:   bump (major | minor | patch)
 
 Pasos:

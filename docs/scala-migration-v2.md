@@ -286,6 +286,7 @@ jobs:
   start-release:
     name: Crear release branch
     runs-on: ubuntu-latest
+    if: github.ref_name == 'develop'
     steps:
       - uses: actions/checkout@v4
         with:
