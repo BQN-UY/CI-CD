@@ -3,11 +3,13 @@ name: Scala Steward — dependencias internas
 # Actualiza dependencias com.bqn y com.zistemas en todos los repos de la org.
 # Las dependencias públicas (Maven Central) son responsabilidad de Dependabot.
 #
-# Requisitos (org-level secrets):
-#   SCALA_STEWARD_GITHUB_TOKEN — PAT con permisos repo + workflow (cuenta de servicio)
-#   NEXUS_URL                  — URL base del Nexus privado
-#   NEXUS_USER                 — Usuario de Nexus con acceso de lectura
-#   NEXUS_PASSWORD             — Contraseña de Nexus
+# Cuenta de servicio: bqn-sysadmin (PAT almacenado en SCALA_STEWARD_GITHUB_TOKEN)
+#
+# Requisitos:
+#   SCALA_STEWARD_GITHUB_TOKEN — org secret — PAT de bqn-sysadmin con scope: repo
+#   NEXUS_USER                 — org secret — usuario Nexus (acceso de lectura)
+#   NEXUS_PASSWORD             — org secret — contraseña Nexus
+#   vars.NEXUS_URL             — org variable — URL base del Nexus privado (no es secret)
 
 on:
   schedule:
@@ -29,4 +31,4 @@ jobs:
           labels:           deps
           sign-commits:     "false"
           coursier-credentials: |
-            ${{ secrets.NEXUS_URL }} realm=Sonatype Nexus Repository Manager username=${{ secrets.NEXUS_USER }} password=${{ secrets.NEXUS_PASSWORD }}
+            ${{ vars.NEXUS_URL }} realm=Sonatype Nexus Repository Manager username=${{ secrets.NEXUS_USER }} password=${{ secrets.NEXUS_PASSWORD }}

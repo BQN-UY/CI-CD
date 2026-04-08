@@ -808,14 +808,14 @@ Scala Steward corre centralmente en este repo (`BQN-UY/CI-CD`) via
 1. Copiar `.scala-steward.conf` desde `templates/scala-api/` al repo del proyecto
 2. Agregar `- BQN-UY/<nombre-repo>` en `scala-steward/repos.md`
 
-**Secrets requeridos (org-level):**
+**Requisitos org-level para el runner:**
 
-| Secret | Descripción |
-|---|---|
-| `SCALA_STEWARD_GITHUB_TOKEN` | PAT con permisos `repo` + `workflow` (cuenta de servicio) |
-| `NEXUS_URL` | URL base del Nexus privado |
-| `NEXUS_USER` | Usuario con acceso de lectura a Nexus |
-| `NEXUS_PASSWORD` | Contraseña de Nexus |
+| Nombre | Tipo | Descripción |
+|---|---|---|
+| `SCALA_STEWARD_GITHUB_TOKEN` | secret | PAT de `bqn-sysadmin` con scope `repo` — crea ramas y PRs en repos de la org |
+| `NEXUS_USER` | secret | Usuario Nexus — ya existe org-level, acceso de lectura es suficiente |
+| `NEXUS_PASSWORD` | secret | Contraseña Nexus — ya existe org-level |
+| `vars.NEXUS_URL` | variable | URL base del Nexus — no es secret, ya existe org-level |
 
 > Ninguna herramienta debe apuntar a `release/**` ni `hotfix/**`.
 > Una actualización de dep urgente en esos contextos se hace manualmente como `fix/*`.
