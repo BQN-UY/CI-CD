@@ -369,7 +369,11 @@ Pasos:
 #### `make-release.yml` — hace el release completo a production
 
 ```
-Trigger: workflow_dispatch (ejecutar desde rama release/vX.Y.Z o hotfix/vX.Y.Z-desc)
+Trigger: workflow_dispatch
+         branches: release/** · hotfix/**
+         (el selector del UI solo muestra estas ramas; seleccionar la correcta manualmente —
+          si hay hotfix/** activo tiene prioridad sobre release/**)
+
 
 Pasos:
   1. backend/scala/lint-build
@@ -593,7 +597,7 @@ sequenceDiagram
     GHA->>NX: publish snapshot JAR/WAR
     GHA->>JNK: POST webhook — env: staging
 
-    Note over DEV,JNK: make-release.yml (workflow_dispatch desde release/** o hotfix/**)
+    Note over DEV,JNK: make-release.yml (workflow_dispatch — UI solo muestra release/** y hotfix/**)
     DEV->>GHA: trigger manual
     GHA->>NX: publish release JAR/WAR
     GHA->>JNK: POST webhook — env: production

@@ -315,6 +315,9 @@ name: Make release
 
 on:
   workflow_dispatch:
+    branches:
+      - "release/**"
+      - "hotfix/**"
 
 jobs:
   release:

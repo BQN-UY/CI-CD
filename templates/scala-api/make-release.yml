@@ -2,6 +2,9 @@ name: Make release
 
 on:
   workflow_dispatch:
+    branches:
+      - "release/**"
+      - "hotfix/**"
     inputs:
       installation:
         description: "Instalaciones destino (coma-separado, ej. install-1,install-2). Vacío = todas."
