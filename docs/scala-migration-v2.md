@@ -120,6 +120,16 @@ releaseIgnoreUntrackedFiles := ...
 `sbt-dynver` setea el campo `version` automáticamente — no declarar `version :=`
 ni `version in ThisBuild :=` en ningún archivo.
 
+Agregar `crossPaths := false` para aplicaciones deployables:
+
+```scala
+// AGREGAR — aplicaciones deployables (JAR/WAR publicados en Nexus para deploy)
+// Evita el sufijo _2.13 en el artifactId: SISTEMA-VERSION.jar en lugar de SISTEMA_2.13-VERSION.jar
+// Las librerías NO deben agregar esto — necesitan crossPaths := true (default) para
+// que sbt resuelva la versión correcta de Scala al consumirlas como dependencias.
+ThisBuild / crossPaths := false
+```
+
 ### 3.3 Eliminar `version.sbt`
 
 ```bash
@@ -494,6 +504,7 @@ actualizar esa referencia para que use la convención de sbt-dynver antes de mig
 [ ] sbt-dynver agregado en project/plugins.sbt
 [ ] sbt-release eliminado de project/plugins.sbt
 [ ] Configuración de sbt-release eliminada de build.sbt
+[ ] crossPaths := false agregado en build.sbt (aplicaciones deployables)
 [ ] version.sbt eliminado (git rm)
 [ ] sbt version muestra la versión correcta localmente
 [ ] ci.yml actualizado a v2
