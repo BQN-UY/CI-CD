@@ -81,22 +81,32 @@ Este proyecto usa CI/CD v2 de BQN-UY. Las actions reutilizables viven en
 
 ## Convención de configuración
 
-Cada proyecto Scala API trabaja con tres archivos de configuración:
+Cada proyecto Scala API mantiene tres `application.conf` con roles bien diferenciados:
 
-### 1. `reference.conf` — base del framework (no vive en el proyecto)
+### 1. `application.conf` (raíz del proyecto) — configuración Pekko
 
-Provisto por la dependencia del framework BQN en el classpath. Es relativamente estático e incluye las configuraciones generales de Pekko/Akka y valores por defecto del framework. Los otros dos archivos lo incorporan con:
+Relativamente estático. Solo contiene los includes de Pekko y las sobreescrituras del bloque `pekko {}` (loggers, loglevel, actor provider, dispatchers). **No incluye configuración de la aplicación.**
 
 ```hocon
-include "reference"  # Includes all reference.conf settings
+# Main application configuration
+include "version"                    # Configuraciones de versión (si existen)
+include "pekko-reference"            # Configuración base de Pekko
+include "pekko-http-core-reference"  # Configuración del núcleo HTTP
+include "pekko-http-reference"       # Rutas y extensiones HTTP
+
+pekko {
+  loggers = ["org.apache.pekko.event.slf4j.Slf4jLogger"]
+  loglevel = "DEBUG"
+  ...
+}
 ```
 
 ### 2. `docs/application.conf` — configuración de referencia (sin secretos)
 
-Documenta todas las claves que requiere el sistema según su `AppConfig`. Se incluye en el repositorio y es de lectura pública. Reglas:
+Documenta todas las claves que requiere el sistema según su `AppConfig`. Se incluye en el repositorio y es de lectura pública. Incorpora los `reference.conf` del framework (Pekko + framework BQN) con una sola línea. Reglas:
 
 - Empieza con `include "reference"  # Includes all reference.conf settings`
-- Solo incluye configuración de la aplicación — no repite bloques ya cubiertos por `reference.conf`
+- Solo incluye configuración de la aplicación — no repite el bloque `pekko {}` del raíz
 - Reemplaza passwords y tokens con `"••••••••"` — nunca exponer credenciales reales
 - Sirve de guía para configurar un ambiente nuevo
 
