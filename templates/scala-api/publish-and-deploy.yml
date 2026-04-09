@@ -1,0 +1,48 @@
+name: Publish and deploy
+
+on:
+  push:
+    branches: [develop, "hotfix/**", "release/**"]
+
+jobs:
+  publish:
+    name: Publish JAR snapshot → Nexus + deploy testing/staging
+    runs-on: ubuntu-latest
+    environment: ${{ startsWith(github.ref, 'refs/heads/hotfix/') && 'staging' || 'testing' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # sbt-dynver necesita historial Git completo
+
+      - uses: BQN-UY/CI-CD/.github/actions/backend/scala/lint-build@v2
+
+      - name: Publish snapshot to Nexus
+        id: publish
+        shell: bash
+        run: |
+          sbt publish
+          echo "version=$(sbt -batch -error 'print dynver')" >> "$GITHUB_OUTPUT"
+        env:
+          NEXUS_USER:     ${{ secrets.NEXUS_USER }}
+          NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
+          NEXUS_URL:      ${{ secrets.NEXUS_URL }}
+
+      - name: Deploy to testing
+        if: github.ref == 'refs/heads/develop' || startsWith(github.ref, 'refs/heads/release/')
+        uses: BQN-UY/CI-CD/.github/actions/shared/jenkins-deploy-trigger@v2
+        with:
+          environment: testing
+          service-url: ${{ secrets.JENKINS_DEPLOY_URL }}
+          token:       ${{ secrets.JENKINS_DEPLOY_TESTING_TOKEN }}
+          sistema:     ${{ vars.SISTEMA || github.event.repository.name }}
+          version:     ${{ steps.publish.outputs.version }}
+
+      - name: Deploy to staging
+        if: startsWith(github.ref, 'refs/heads/hotfix/')
+        uses: BQN-UY/CI-CD/.github/actions/shared/jenkins-deploy-trigger@v2
+        with:
+          environment: staging
+          service-url: ${{ secrets.JENKINS_DEPLOY_URL }}
+          token:       ${{ secrets.JENKINS_DEPLOY_STAGING_TOKEN }}
+          sistema:     ${{ vars.SISTEMA || github.event.repository.name }}
+          version:     ${{ steps.publish.outputs.version }}

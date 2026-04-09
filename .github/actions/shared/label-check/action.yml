@@ -19,6 +19,7 @@ runs:
           feature
           fix
           chore
+          update
           deploy-action
       env:
         GITHUB_TOKEN: ${{ inputs.github-token }}

@@ -30,11 +30,16 @@ runs:
 
           const branch = pr.head.ref;
           const map = {
-            'feature/': 'feature',
-            'fix/':     'fix',
-            'chore/':   'chore',
-            'hotfix/':  'fix',
-            'release/': 'deploy-action',
+            'feature/':        'feature',
+            'fix/':            'fix',
+            'chore/':          'chore',
+            'docs/':           'chore',
+            'refactor/':       'chore',
+            'hotfix/':         'fix',
+            'release/':        'deploy-action',
+            'dependabot/':     'update',
+            'scala-steward/':  'update',
+            'update/':         'update',  // prefijo default de Scala Steward
           };
           const managedLabels = new Set(Object.values(map));
           const owner = context.repo.owner;

@@ -54,7 +54,7 @@ Las actions se referencian desde los workflows de cada proyecto usando el tag `@
     tag: ${{ steps.tag.outputs.tag }}
 
 # Disparar deploy vía webhook
-- uses: BQN-UY/CI-CD/.github/actions/shared/deploy-trigger@v2
+- uses: BQN-UY/CI-CD/.github/actions/shared/jenkins-deploy-trigger@v2
   with:
     environment: production
     service-url: ${{ secrets.DEPLOY_WEBHOOK_URL }}

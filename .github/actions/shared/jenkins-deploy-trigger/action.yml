@@ -1,0 +1,97 @@
+name: Jenkins deploy trigger
+description: Dispara deploy vía Generic Webhook Trigger (GWT) de Jenkins
+
+inputs:
+  environment:
+    description: testing | staging | production
+    required: true
+  service-url:
+    description: URL base del webhook GWT (ej. https://jenkins.bqn.uy/generic-webhook-trigger/invoke)
+    required: true
+  token:
+    description: Token GWT del job Jenkins. Se envía como ?token= para rutear al job correcto.
+    required: true
+  sistema:
+    description: Nombre del sistema/servicio a desplegar (ej. payments-api)
+    required: false
+    default: ""
+  version:
+    description: Versión del artefacto a desplegar (ej. 1.5.0 o 1.5.0+3-abc1234)
+    required: false
+    default: ""
+  installation:
+    description: Instalaciones destino (coma-separado, ej. install-1,install-2). Vacío = auto_deploy en todas.
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Trigger deploy
+      shell: bash
+      env:
+        ENV:          ${{ inputs.environment }}
+        SERVICE_URL:  ${{ inputs.service-url }}
+        TOKEN:        ${{ inputs.token }}
+        SISTEMA:      ${{ inputs.sistema }}
+        VERSION:      ${{ inputs.version }}
+        INSTALLATION: ${{ inputs.installation }}
+        GH_SHA:       ${{ github.sha }}
+        GH_ACTOR:     ${{ github.actor }}
+      run: |
+        set -euo pipefail
+
+        if ! command -v jq &>/dev/null; then
+          echo "Error: jq is required but not installed. Add a 'sudo apt-get install -y jq' step before this action." >&2
+          exit 1
+        fi
+
+        case "$ENV" in
+          testing|staging|production) ;;
+          *)
+            echo "Error: invalid environment '$ENV'. Expected one of: testing, staging, production." >&2
+            exit 1
+            ;;
+        esac
+
+        # El token va como query param — GWT lo usa para rutear al job correcto.
+        # No se usa Authorization header porque GWT no lo soporta por defecto.
+        PAYLOAD=$(jq -nc \
+          --arg environment  "$ENV" \
+          --arg ref          "$GH_SHA" \
+          --arg actor        "$GH_ACTOR" \
+          --arg sistema      "$SISTEMA" \
+          --arg version      "$VERSION" \
+          --arg installation "$INSTALLATION" \
+          '{environment: $environment, ref: $ref, actor: $actor,
+            sistema: $sistema, version: $version,
+            installation: $installation}')
+
+        # URL-encode el token para evitar que caracteres reservados (+, &, %)
+        # corrompan la query string.
+        TOKEN_ENC=$(jq -rn --arg t "$TOKEN" '$t | @uri')
+
+        # Construir el separador según si SERVICE_URL ya contiene query params.
+        if [[ "$SERVICE_URL" == *"?"* ]]; then
+          DEPLOY_URL="${SERVICE_URL}&token=${TOKEN_ENC}"
+        else
+          DEPLOY_URL="${SERVICE_URL}?token=${TOKEN_ENC}"
+        fi
+
+        # Sin --retry: POST sobre un webhook no idempotente — un retry ante timeout
+        # dispararía múltiples deploys si Jenkins ya procesó la request.
+        RESPONSE_BODY=$(mktemp)
+        HTTP_STATUS=$(curl -s -w "%{http_code}" -o "$RESPONSE_BODY" \
+          --connect-timeout 10 \
+          --max-time 30 \
+          -X POST "$DEPLOY_URL" \
+          -H "Content-Type: application/json" \
+          -d "$PAYLOAD")
+
+        if [ "$HTTP_STATUS" != "200" ] && [ "$HTTP_STATUS" != "204" ]; then
+          echo "Webhook failed — HTTP $HTTP_STATUS" >&2
+          echo "Response body: $(head -c 500 "$RESPONSE_BODY")" >&2
+          rm -f "$RESPONSE_BODY"
+          exit 1
+        fi
+        rm -f "$RESPONSE_BODY"

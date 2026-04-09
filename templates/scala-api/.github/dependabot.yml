@@ -1,0 +1,26 @@
+version: 2
+updates:
+  # Dependencias públicas (Maven Central, Sonatype, etc.)
+  # Las dependencias internas com.bqn y com.zistemas son responsabilidad de Scala Steward.
+  - package-ecosystem: "sbt"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    target-branch: "develop"   # siempre hacia develop — nunca release/** ni hotfix/**
+    labels:
+      - "update"               # satisface label-check; auto-label también lo cubre por el prefijo dependabot/
+    open-pull-requests-limit: 5
+    ignore:
+      # Dependencias internas — gestionadas por Scala Steward
+      - dependency-name: "com.bqn:*"
+      - dependency-name: "com.zistemas:*"
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    target-branch: "develop"
+    labels:
+      - "update"
+    open-pull-requests-limit: 5

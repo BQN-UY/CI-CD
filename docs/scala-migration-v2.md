@@ -120,6 +120,16 @@ releaseIgnoreUntrackedFiles := ...
 `sbt-dynver` setea el campo `version` automáticamente — no declarar `version :=`
 ni `version in ThisBuild :=` en ningún archivo.
 
+Agregar `crossPaths := false` para aplicaciones deployables:
+
+```scala
+// AGREGAR — aplicaciones deployables (JAR/WAR publicados en Nexus para deploy)
+// Evita el sufijo _2.13 en el artifactId: SISTEMA-VERSION.jar en lugar de SISTEMA_2.13-VERSION.jar
+// Las librerías NO deben agregar esto — necesitan crossPaths := true (default) para
+// que sbt resuelva la versión correcta de Scala al consumirlas como dependencias.
+ThisBuild / crossPaths := false
+```
+
 ### 3.3 Eliminar `version.sbt`
 
 ```bash
@@ -157,7 +167,7 @@ name: CI
 
 on:
   pull_request:
-    branches: [develop]
+    branches: [develop, "release/**", "hotfix/**"]
   push:
     branches: ["release/**", "hotfix/**"]
 
@@ -191,18 +201,18 @@ jobs:
       - uses: BQN-UY/CI-CD/.github/actions/shared/security-scan@v2
 ```
 
-### `publish-snapshot.yml`
+### `publish-and-deploy.yml`
 
 ```yaml
-name: Publish snapshot
+name: Publish and deploy
 
 on:
   push:
-    branches: [develop, "hotfix/**"]
+    branches: [develop, "hotfix/**", "release/**"]
 
 jobs:
   publish:
-    name: Publish JAR snapshot → Nexus
+    name: Publish JAR snapshot → Nexus + deploy testing/staging
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -212,13 +222,60 @@ jobs:
       - uses: BQN-UY/CI-CD/.github/actions/backend/scala/lint-build@v2
 
       - name: Publish snapshot to Nexus
+        id: publish
         shell: bash
-        run: sbt publish
+        run: |
+          sbt publish
+          echo "version=$(sbt -batch -error 'print dynver')" >> "$GITHUB_OUTPUT"
         env:
           NEXUS_USER:     ${{ secrets.NEXUS_USER }}
           NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
           NEXUS_URL:      ${{ secrets.NEXUS_URL }}
+
+      - name: Deploy to testing
+        if: github.ref == 'refs/heads/develop' || startsWith(github.ref, 'refs/heads/release/')
+        uses: BQN-UY/CI-CD/.github/actions/shared/jenkins-deploy-trigger@v2
+        with:
+          environment: testing
+          service-url: ${{ secrets.JENKINS_DEPLOY_URL }}
+          token:       ${{ secrets.JENKINS_DEPLOY_TESTING_TOKEN }}
+          sistema:     ${{ vars.SISTEMA }}
+          version:     ${{ steps.publish.outputs.version }}
+
+      - name: Deploy to staging
+        if: startsWith(github.ref, 'refs/heads/hotfix/')
+        uses: BQN-UY/CI-CD/.github/actions/shared/jenkins-deploy-trigger@v2
+        with:
+          environment: staging
+          service-url: ${{ secrets.JENKINS_DEPLOY_URL }}
+          token:       ${{ secrets.JENKINS_DEPLOY_STAGING_TOKEN }}
+          sistema:     ${{ vars.SISTEMA }}
+          version:     ${{ steps.publish.outputs.version }}
 ```
+
+### Fixes durante el ciclo de release
+
+> **Cambio de comportamiento respecto a v1:** en v1 no se usaban ramas `release/**`
+> ni `develop`. Este es uno de los cambios más importantes a internalizar en v2.
+
+Una vez creada la rama `release/vX.Y.Z` con `start-release.yml`, esa rama y
+`develop` son **independientes**. Los commits que lleguen a `develop` después
+del `start-release` son para la **próxima versión**: no modifican la rama de
+release ni el contenido del release en curso, aunque `publish-and-deploy.yml`
+siga desplegando a `testing` en cada push a `develop`. Como `develop` y
+`release/**` comparten el mismo ambiente `testing`, un push a `develop` durante
+una validación de release **puede pisar el deploy que se está validando**.
+Para evitarlo, congelar merges a `develop` mientras se valida el release en `testing`.
+
+**Si se detecta un problema durante el testeo en testing, el fix se commitea
+directamente sobre `release/vX.Y.Z` — nunca sobre `develop`.**
+
+El push a `release/vX.Y.Z` dispara `publish-and-deploy.yml` automáticamente:
+publica el snapshot en Nexus y redespliega testing. Una vez validado,
+`make-release.yml` cierra el ciclo: crea el tag, publica en Nexus releases,
+mergea a main y hace back-merge a develop (así los fixes vuelven a develop al final).
+
+---
 
 ### `start-release.yml`
 
@@ -239,6 +296,7 @@ jobs:
   start-release:
     name: Crear release branch
     runs-on: ubuntu-latest
+    if: github.ref_name == 'develop'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -268,25 +326,16 @@ name: Make release
 
 on:
   workflow_dispatch:
-    inputs:
-      bump:
-        description: Tipo de bump
-        required: true
-        default: minor
-        type: choice
-        options: [major, minor, patch]
-      environment:
-        description: Entorno de deploy
-        required: true
-        default: production
-        type: choice
-        options: [staging, production]
+    branches:
+      - "release/**"
+      - "hotfix/**"
 
 jobs:
   release:
-    name: Tag + Nexus + GitHub Release + deploy + back-merge
+    name: Tag + Nexus + GitHub Release + deploy production + back-merge
     runs-on: ubuntu-latest
-    environment: ${{ inputs.environment }}
+    if: startsWith(github.ref_name, 'release/') || startsWith(github.ref_name, 'hotfix/')
+    environment: production
     permissions:
       contents: write          # requerido para crear tags y hacer push de ramas
       security-events: write   # requerido para subir SARIF al tab de Security
@@ -299,11 +348,24 @@ jobs:
 
       - uses: BQN-UY/CI-CD/.github/actions/shared/security-scan@v2
 
+      - name: Extraer versión desde nombre de rama
+        id: version
+        shell: bash
+        run: |
+          # Deriva la versión directamente del nombre de la rama para garantizar
+          # que el tag creado coincide con la versión indicada en la rama.
+          # Soporta release/vX.Y.Z y hotfix/vX.Y.Z-descripcion
+          VERSION=$(echo "${{ github.ref_name }}" | grep -oP '(?<=/)v[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+          if [ -z "$VERSION" ]; then
+            echo "Error: no se pudo extraer versión desde '${GITHUB_REF_NAME}'. Formato esperado: release/vX.Y.Z o hotfix/vX.Y.Z-desc" >&2
+            exit 1
+          fi
+          echo "tag=$VERSION" >> "$GITHUB_OUTPUT"
+
       - name: Crear tag SemVer
-        id: tag
         uses: BQN-UY/CI-CD/.github/actions/shared/semver-tag@v2
         with:
-          bump: ${{ inputs.bump }}
+          tag: ${{ steps.version.outputs.tag }}
 
       - name: Publish release JAR → Nexus
         shell: bash
@@ -313,9 +375,10 @@ jobs:
           NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
           NEXUS_URL:      ${{ secrets.NEXUS_URL }}
 
-      - uses: BQN-UY/CI-CD/.github/actions/shared/github-release@v2
+      - name: GitHub Release
+        uses: BQN-UY/CI-CD/.github/actions/shared/github-release@v2
         with:
-          tag: ${{ steps.tag.outputs.tag }}
+          tag: ${{ steps.version.outputs.tag }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -331,11 +394,12 @@ jobs:
           source: main
           target: develop
 
-      - uses: BQN-UY/CI-CD/.github/actions/shared/deploy-trigger@v2
+      - name: Deploy to production
+        uses: BQN-UY/CI-CD/.github/actions/shared/jenkins-deploy-trigger@v2
         with:
-          environment: ${{ inputs.environment }}
-          service-url: ${{ secrets.DEPLOY_WEBHOOK_URL }}
-          token:       ${{ secrets.DEPLOY_TOKEN }}
+          environment: production
+          service-url: ${{ secrets.JENKINS_DEPLOY_URL }}
+          token:       ${{ secrets.JENKINS_DEPLOY_PRODUCTION_TOKEN }}
 ```
 
 ### `start-hotfix.yml`
@@ -352,8 +416,11 @@ on:
 
 jobs:
   start-hotfix:
+    # main == último tag de release: make-release siempre mergea a main y crea
+    # el tag en ese mismo commit. Partir de main es partir del estado de producción.
     name: Crear hotfix branch desde main
     runs-on: ubuntu-latest
+    if: github.ref_name == 'main'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -379,17 +446,36 @@ jobs:
 
 ---
 
-## Paso 5 — Secrets requeridos en el repositorio
+## Paso 5 — Secrets y variables requeridos
 
-Confirmar con DevOps que los siguientes secrets están configurados en el repo:
+### Secrets de Nexus (nivel repo o org)
+
+Confirmar con DevOps que los siguientes secrets están disponibles en el repo:
 
 | Secret | Descripción |
 |---|---|
 | `NEXUS_USER` | Usuario de Nexus |
 | `NEXUS_PASSWORD` | Contraseña de Nexus |
 | `NEXUS_URL` | URL base del repositorio Nexus |
-| `DEPLOY_WEBHOOK_URL` | Endpoint del webhook de deploy |
-| `DEPLOY_TOKEN` | Token de autenticación del webhook |
+
+### Secrets de Jenkins (org-level — ya configurados en BQN-UY)
+
+Los siguientes secrets son **org-level** y no requieren configuración por repo:
+
+| Secret | Descripción |
+|---|---|
+| `JENKINS_DEPLOY_URL` | `https://jenkins.bqn.uy/generic-webhook-trigger/invoke` |
+| `JENKINS_DEPLOY_TESTING_TOKEN` | Token GWT — job `deploy-nexus-testing` |
+| `JENKINS_DEPLOY_STAGING_TOKEN` | Token GWT — job `deploy-nexus-staging` |
+| `JENKINS_DEPLOY_PRODUCTION_TOKEN` | Token GWT — job `deploy-nexus-production` |
+
+> Ver [`docs/jenkins.md`](../docs/jenkins.md) para el detalle del mecanismo de ruteo por token.
+
+### Variable de repo requerida
+
+| Variable | Descripción |
+|---|---|
+| `SISTEMA` | Nombre del servicio (ej. `payments-api`). Configurable en **Settings → Variables → Actions** del repo. |
 
 Los secrets `DEPLOY_KEY`, `DEPLOY_IP`, `DEPLOY_PORT`, `DEPLOY_USER`, `JENKINS_USER`,
 `JENKINS_TOKEN` y `PUBLISHER_PATH` usados en v1 **dejan de ser necesarios** en v2.
@@ -418,14 +504,21 @@ actualizar esa referencia para que use la convención de sbt-dynver antes de mig
 [ ] sbt-dynver agregado en project/plugins.sbt
 [ ] sbt-release eliminado de project/plugins.sbt
 [ ] Configuración de sbt-release eliminada de build.sbt
+[ ] crossPaths := false agregado en build.sbt (aplicaciones deployables)
 [ ] version.sbt eliminado (git rm)
 [ ] sbt version muestra la versión correcta localmente
 [ ] ci.yml actualizado a v2
-[ ] publish-snapshot.yml actualizado a v2
+[ ] publish-and-deploy.yml actualizado a v2
 [ ] start-release.yml creado
 [ ] make-release.yml actualizado a v2
 [ ] start-hotfix.yml actualizado a v2
-[ ] Secrets de deploy configurados por DevOps
+[ ] Secrets de Jenkins confirmados como org-level (JENKINS_DEPLOY_URL, JENKINS_DEPLOY_*_TOKEN)
+[ ] Variable SISTEMA configurada en Settings → Variables → Actions del repo
+[ ] CLAUDE.md copiado desde templates/scala-api/CLAUDE.md
+[ ] .github/copilot-instructions.md copiado desde templates/scala-api/.github/copilot-instructions.md
+[ ] .github/dependabot.yml copiado desde templates/scala-api/.github/dependabot.yml
+[ ] .scala-steward.conf copiado desde templates/scala-api/.scala-steward.conf
+[ ] Repo agregado en BQN-UY/CI-CD scala-steward/repos.md
 [ ] PR abierto con label feature hacia develop
 [ ] CI pasa en la feature branch
 ```
