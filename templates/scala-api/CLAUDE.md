@@ -81,18 +81,26 @@ Este proyecto usa CI/CD v2 de BQN-UY. Las actions reutilizables viven en
 
 ## Convención de configuración
 
-Cada proyecto Scala API mantiene dos archivos de configuración de referencia:
+Cada proyecto Scala API trabaja con tres archivos de configuración:
 
-### `docs/application.conf` — configuración de referencia (sin secretos)
+### 1. `reference.conf` — base del framework (no vive en el proyecto)
+
+Provisto por la dependencia del framework BQN en el classpath. Es relativamente estático e incluye las configuraciones generales de Pekko/Akka y valores por defecto del framework. Los otros dos archivos lo incorporan con:
+
+```hocon
+include "reference"  # Includes all reference.conf settings
+```
+
+### 2. `docs/application.conf` — configuración de referencia (sin secretos)
 
 Documenta todas las claves que requiere el sistema según su `AppConfig`. Se incluye en el repositorio y es de lectura pública. Reglas:
 
 - Empieza con `include "reference"  # Includes all reference.conf settings`
-- Solo incluye configuración de la aplicación (no bloques internos de Pekko/Akka)
+- Solo incluye configuración de la aplicación — no repite bloques ya cubiertos por `reference.conf`
 - Reemplaza passwords y tokens con `"••••••••"` — nunca exponer credenciales reales
 - Sirve de guía para configurar un ambiente nuevo
 
-### `src/test/resources/application.conf` — configuración de service tests
+### 3. `src/test/resources/application.conf` — configuración de service tests
 
 Usada por los tests de integración HTTP que ejercitan los endpoints de la propia API. Se incluye en el repositorio con valores de testing (no producción). Reglas:
 
