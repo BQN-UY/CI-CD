@@ -79,6 +79,60 @@ Este proyecto usa CI/CD v2 de BQN-UY. Las actions reutilizables viven en
 | `JENKINS_DEPLOY_PRODUCTION_TOKEN` | **org** | Token GWT — rutea al job `deploy-nexus-production` |
 | `vars.SISTEMA` | repo | Nombre del servicio — se pasa en el payload al webhook |
 
+## Convención de configuración
+
+Cada proyecto Scala API mantiene dos archivos de configuración de referencia:
+
+### `docs/application.conf` — configuración de referencia (sin secretos)
+
+Documenta todas las claves que requiere el sistema según su `AppConfig`. Se incluye en el repositorio y es de lectura pública. Reglas:
+
+- Empieza con `include "reference"  # Includes all reference.conf settings`
+- Solo incluye configuración de la aplicación (no bloques internos de Pekko/Akka)
+- Reemplaza passwords y tokens con `"••••••••"` — nunca exponer credenciales reales
+- Sirve de guía para configurar un ambiente nuevo
+
+### `src/test/resources/application.conf` — configuración de service tests
+
+Usada por los tests de integración HTTP que ejercitan los endpoints de la propia API. Se incluye en el repositorio con valores de testing (no producción). Reglas:
+
+- Empieza con `include "reference"  # Includes all reference.conf settings`
+- Contiene la configuración completa del servidor (igual estructura que `docs/application.conf`)
+- Agrega el bloque del cliente HTTP de la propia API para que los tests puedan conectarse:
+
+```hocon
+# Token de acceso para los service tests.
+# Puede ser un token estático de fixed-tokens o un accessToken de bsecurity.
+access-token = ""
+
+# Cliente HTTP apuntando al servidor bajo test.
+nombre-api {
+  url = "http://localhost:8080"
+; url = "https://api.testing.banquinet.org/nombre-api"
+  connection-timeout            = 3 seconds
+  request-timeout               = 10 seconds
+  max-connections               = 10
+  max-retries                   = 3
+  max-open-requests             = 32
+  circuit-breaker-max-failures  = 5
+  circuit-breaker-reset-timeout = 20 seconds
+  check-connection-task {
+    enabled       = false
+    initial-delay = "1 min"
+    interval      = "10 min"
+    inactive      = []
+  }
+  dispatcher {
+    type = Dispatcher
+    executor = "thread-pool-executor"
+    thread-pool-executor { fixed-pool-size = 4 }
+    throughput = 1
+  }
+}
+```
+
+La URL local queda activa por defecto; la URL de testing se comenta con `;` para cambiar rápidamente de target sin modificar el archivo.
+
 ## Qué NO hacer
 
 - No agregar lógica de build/deploy directamente en los workflows — usar las actions de `BQN-UY/CI-CD`
