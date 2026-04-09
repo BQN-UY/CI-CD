@@ -126,7 +126,7 @@ access-token = ""
 # Cliente HTTP apuntando al servidor bajo test.
 nombre-api {
   url = "http://localhost:8080"
-; url = "https://api.testing.banquinet.org/nombre-api"
+# url = "https://api.testing.banquinet.org/nombre-api"
   connection-timeout            = 3 seconds
   request-timeout               = 10 seconds
   max-connections               = 10
@@ -149,7 +149,7 @@ nombre-api {
 }
 ```
 
-La URL local queda activa por defecto; la URL de testing se comenta con `;` para cambiar rápidamente de target sin modificar el archivo.
+La URL local queda activa por defecto; la URL de testing se comenta con `#` para cambiar rápidamente de target sin modificar el archivo.
 
 ## Qué NO hacer
 
