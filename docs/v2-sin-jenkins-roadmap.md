@@ -41,11 +41,12 @@ Una vez resueltas (1)(2)(3): instalar runner, implementar workflow, validar end-
 
 ### Hito 4 — Migrar proyectos v1 → v2 progresivamente (pendiente Hito 3)
 
-Criterio de orden: **bajo riesgo primero** (1 instalación, sin producción). `sga` (16 instalaciones) y `efactura` (10) al final. Por proyecto:
+Criterio de orden: **bajo riesgo primero** (1 instalación, sin producción). `sga` (16 instalaciones) y `efactura` (10) al final. Por proyecto, el PR de migración replica el que se hizo en acp-api#11:
 
-- Copiar templates v2 a `.github/workflows/`
-- Agregar `ThisBuild / dynverSeparator := "-"` en `build.sbt`
-- Configurar secrets (Nexus + GH)
+- Copiar templates v2 a `.github/workflows/` (`ci.yml`, `publish.yml`, `make-release.yml`, `start-release.yml`, `start-hotfix.yml`, `cleanup-snapshots.yml`, `update-next-bump.yml`, `setup-labels.yml`)
+- Crear `.github/next-bump` con `minor`
+- Limpiar `build.sbt`: remover `publishTo`, `dynverSeparator`, `dynverSonatypeSnapshots`, `nexusUrl`; conservar `credentials` + `NEXUS_USER/PASSWORD` (necesarios para RESOLVER libs internas de Nexus privado)
+- Configurar tag protection (GH Settings → Tag protection): `v[0-9]*` y `v*-rc.*` protegidos
 - Primer deploy de prueba
 
 ### Hito 5 — Apagar deploy v1 (pendiente Hito 4)
@@ -56,13 +57,24 @@ Cuando ningún proyecto use deploy v1: eliminar `scala-deploy-*.yml` del repo CI
 
 | Hito | Estado |
 |---|---|
-| 1 — Cleanup workflows v2 | ✅ Completado |
-| 2 — Diseño deploy GA-native | ⏳ Pendiente relevamiento |
-| 3 — Implementar deploy GA-native | ⏳ Bloqueado por Hito 2 |
+| 1 — Cleanup workflows v2 | ✅ Completado (PR #82) |
+| 2 — Spec del deploy GA-native | ✅ Completado (PR #83); §7 del spec (server apps → GH Releases) también ejecutado (PR #85/86) y validado en acp-api (PR #11) |
+| 2bis — Respuestas Soporte/IDS (§5.1, §5.2, §5.3) | ⏳ Pendiente relevamiento (input humano) |
+| 3 — Implementar deploy GA-native | ⏳ Bloqueado por Hito 2bis |
 | 4 — Migrar proyectos a v2 | ⏳ Bloqueado por Hito 3 |
 | 5 — Apagar deploy v1 | ⏳ Bloqueado por Hito 4 |
 
+## Modelo v2 operativo hoy (server apps)
+
+Tras PR #85, los server apps tienen:
+- `publish.yml` en cada push → GH pre-release `v<NEXT>-snapshot.NNN` (develop) o `vX.Y.Z-rc.NNN` (release/hotfix) con JAR assembly adjunto
+- `make-release.yml` manual → release final `vX.Y.Z` + back-merge + reset `.github/next-bump`
+- `cleanup-snapshots.yml` cron daily → conserva últimos 3 snapshots por target
+- `update-next-bump.yml` en PR merged con label `breaking-change` → escala a `major`
+
+Proyectos migrados: **acp-api** (validado end-to-end con `v0.2.0-snapshot.001`).
+
 ## Implicancias inmediatas para repos v2
 
-- **acp-api**: queda en publish-only. Su deploy a testing/staging vuelve cuando Hito 3 esté listo. Como no está en producción, el gap es aceptable.
-- **Nuevas migraciones**: pausar hasta Hito 3, salvo que el equipo acepte explícitamente vivir en publish-only durante el gap.
+- **acp-api**: queda en publish-only (publica artefactos a GH Releases pero no deploya). Su auto-deploy a testing/staging vuelve cuando Hito 3 esté listo. Como no está en producción, el gap es aceptable.
+- **Nuevas migraciones**: posibles ahora para proyectos que acepten explícitamente vivir en publish-only durante el gap hasta Hito 3. Para proyectos en producción activa, pausar hasta Hito 3.
