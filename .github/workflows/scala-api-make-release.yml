@@ -33,6 +33,10 @@ jobs:
       security-events: write      # upload de SARIF al tab de Security
     env:
       TZ: America/Montevideo
+      # sbt resuelve dependencias desde el Nexus privado BQN.
+      # NO publicamos a Nexus pero sí descargamos libs internas.
+      NEXUS_USER:     ${{ secrets.NEXUS_USER }}
+      NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
         with:

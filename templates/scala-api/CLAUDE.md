@@ -118,15 +118,14 @@ Archivo en este repo, contenido: `minor` (default) o `major`.
 
 ## Secrets y variables
 
-Para server apps (este proyecto) **no se requieren secrets de Nexus** — los artefactos van a GH Releases. Auth nativa con `${{ secrets.GITHUB_TOKEN }}`, auto-provisto por GitHub.
-
 | Secret / Variable | Nivel | Uso |
 |---|---|---|
-| (ninguno explícito) | — | Build + publish a GH Releases solo necesitan el `GITHUB_TOKEN` que GitHub provee automáticamente |
+| `NEXUS_USER` / `NEXUS_PASSWORD` | repo | **Resolver** dependencias desde el Nexus privado BQN (sbt resolve). NO se usan para publicar — server apps publican a GH Releases. |
+| `GITHUB_TOKEN` | auto-provisto | Crear tags, releases, deployments en el propio repo |
 
-Cuando el deploy GA-native esté listo (Hito 3, ver `docs/v2-hito2-deploy-spec.md`), se agregarán secrets para Portainer / SSH según el mecanismo elegido.
-
-> Los secrets `NEXUS_*`, `JENKINS_DEPLOY_*` y `vars.SISTEMA` que aparecen en proyectos v1 **NO aplican** a server apps en v2. Si están configurados en el repo, se pueden ignorar/eliminar tras la migración.
+- `NEXUS_URL` ya **no se requiere** (antes era para `publishTo`, que ya no se usa).
+- Cuando el deploy GA-native esté listo (Hito 3, ver `docs/v2-hito2-deploy-spec.md`), se agregarán secrets para Portainer / SSH según el mecanismo elegido.
+- Los secrets `JENKINS_DEPLOY_*` y `vars.SISTEMA` que aparecen en proyectos v1 **NO aplican** a server apps en v2. Si están configurados en el repo, se pueden eliminar tras la migración.
 
 ## Convención de configuración
 

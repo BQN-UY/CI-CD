@@ -61,7 +61,8 @@ Este proyecto usa CI/CD v2 de BQN-UY. No agregar lógica de build o deploy direc
 
 ## Secrets
 
-Para server apps no se requieren secrets especiales — el `GITHUB_TOKEN` que GitHub provee automáticamente alcanza para publish y deploy GA-native (cuando exista).
+- `NEXUS_USER` / `NEXUS_PASSWORD` (repo): **resolver** libs internas desde Nexus BQN. NO se usan para publicar — apps publican a GH Releases.
+- `GITHUB_TOKEN`: auto-provisto. Crear tags, releases, deployments.
 
 ## Qué NO hacer
 
