@@ -67,6 +67,12 @@ es el step `Executing deploy script` usando `appleboy/ssh-action`:
         '${{ secrets.JENKINS_URL }}/${{ secrets.JENKINS_DEPLOY_JOB }}/buildWithParameters?SISTEMA=...&VERSION=...&USER=...'
 ```
 
+> **Quirk conocido de v1:** el valor que devuelve `/crumbIssuer/api/json` es un JSON
+> (`{"crumbRequestField":"...","crumb":"..."}`), pero se pasa a `-H "$crumb"` sin parsear.
+> Esto **no es un header CSRF válido** — el POST funciona porque el Jenkins destino tiene
+> la protección CSRF desactivada o relajada. En v2 con GWT este problema desaparece: GWT
+> no requiere crumb y la autorización va por token en la URL.
+
 ### Secrets involucrados
 
 | Secret | Propósito |
@@ -84,8 +90,11 @@ es el step `Executing deploy script` usando `appleboy/ssh-action`:
 ### Diferencia fundamental con v2
 
 En **v2**, la action `shared/jenkins-deploy-trigger` hace el POST al endpoint
-GWT de Jenkins **directamente desde los runners de GitHub Actions** (internet),
-lo que requiere que Jenkins sea alcanzable públicamente.
+GWT de Jenkins **directamente desde el runner de GitHub Actions**, por lo que
+Jenkins debe ser alcanzable desde ese runner. Con runners GitHub-hosted esto
+típicamente implica exposición pública de Jenkins (o acceso mediante un proxy /
+conectividad equivalente); con runners self-hosted dentro de la red interna,
+Jenkins puede mantenerse en red privada como en v1.
 Ver análisis de implicaciones de seguridad en `BQN-UY/jenkins` →
 `docs/seguridad/analisis-trigger-v1-v2.md`.
 
