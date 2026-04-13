@@ -1,155 +1,219 @@
-# Hito 2 — Spec del deploy GA-native (borrador)
+# Hito 2 — Spec del deploy GA-native
 
-> Estado: **borrador para discusión** · Tracking: `docs/v2-sin-jenkins-roadmap.md` Hito 2
+> Estado: **borrador en discusión** · Tracking: `docs/v2-sin-jenkins-roadmap.md` Hito 2
 
-Documento para alinear el diseño del workflow de deploy GA-native que reemplaza a Jenkins en v2.
-Contiene: requisitos heredados de v1, decisiones de diseño abiertas, y criterios de aceptación.
+Documento canónico del diseño del deploy GA-native que reemplaza a Jenkins en v2. Captura: principios, modelo de artefactos, convención de versionado, requisitos heredados de v1, decisiones tomadas y decisiones abiertas.
 
 ## Principio rector
 
-**v2 no depende de `BQN-UY/jenkins` para nada.** Ese repo (incluyendo su rama `production`, los scripts groovy, `sistemas.json`, etc.) es legacy de v1 y queda congelado. v2 lee la lógica de v1 sólo como referencia para entender requisitos — pero ningún workflow ni runner GA invoca, importa o lee archivos de ese repo.
+**v2 no depende de `BQN-UY/jenkins` para nada.** Ese repo (rama `production`, scripts groovy, `sistemas.json`, etc.) queda congelado como legacy v1. v2 lee su lógica sólo como referencia descriptiva — ningún workflow, runner, ni script invoca, importa o lee archivos de ese repo.
 
 ---
 
-## 1. Baseline — qué hace el deploy v1 (Jenkins)
+## 1. Tres grupos de proyectos
 
-Resumen de `~/projects/bqn/jenkins/CI_CD/deploy-nexus.groovy` (319 líneas, pipeline declarativo).
-**Esta sección es descriptiva** — captura qué requisitos hay que cubrir en v2. v2 NO lee, ejecuta, ni invoca código del repo `BQN-UY/jenkins` (ver Principio rector).
+| Grupo | Ejemplos | Distribución | Versionado | Storage |
+|---|---|---|---|---|
+| **Server apps** | scala APIs, WARs, python servers | Auto-deploy a testing/staging/production por GA + runner self-hosted | `vX.Y.Z[-snapshot|-rc].NNN` | **GH Releases** del propio repo |
+| **Client apps** | BPos, GPos, IDH (firmwares) | Instalación manual en equipos externos | TBD por equipo | TBD (probablemente GH Releases) |
+| **Libs** | scala libs, protocolos comunes | Consumidas por builds | `<base>-SNAPSHOT` (Maven-standard) | **Nexus** `maven-snapshots` / `maven-releases` |
 
-**Inputs** (por webhook GWT desde GitHub Actions):
-- `SISTEMA` — nombre del sistema, debe coincidir con `sistemas.json`
-- `VERSION` — sbt-dynver (snapshot o release) o tag explícito
-- `ENVIRONMENT` — `testing` | `staging` | `production`
-- `ACTOR` — github actor que disparó el deploy
-- `INSTALLATION` — coma-separado, vacío = todas las que tengan `auto_deploy: true`
-- `RESTORE` — bool, restaurar DB antes (solo testing/staging)
+Este Hito 2 cubre **server apps**. Client apps y libs se documentan en sus propios specs/templates cuando corresponda.
+
+---
+
+## 2. Modelo de artefactos para server apps
+
+### 2.1 Storage: GitHub Releases (no Nexus)
+
+Los apps **no publican a Nexus**. Cada artefacto generado por CI vive como adjunto de un GitHub Release/Pre-release del propio repo:
+
+- Auth simplificada: `GITHUB_TOKEN` del runner; sin credenciales Nexus.
+- Single source of truth por proyecto: artefacto + git tag + release notes + sha en un solo lugar.
+- Interfaz uniforme para deploy: `gh release download <tag>` para todo (testing, staging, production).
+- Convergencia con el modelo natural de client apps (BPos/GPos/IDH también vivirían bien acá).
+
+### 2.2 Convención de versionado
+
+| Trigger | Tag GH | Tipo | Cleanup |
+|---|---|---|---|
+| push `develop` | `v<NEXT>-snapshot.NNN` | pre-release | sí (workflow) |
+| push `release/vX.Y.Z` o `hotfix/vX.Y.Z-desc` | `vX.Y.Z-rc.NNN` | pre-release | no |
+| `make-release` (workflow_dispatch) | `vX.Y.Z` | release final | no |
+
+- **NNN**: 3 dígitos zero-padded (`001`, `002`, ..., `999`), auto-incrementa por trigger
+- **`<NEXT>`**: versión target en develop, derivada de `last_final_tag + bump` donde `bump ∈ {minor, major}`
+- **rc.NNN**: cada push a release/hotfix genera el siguiente RC automáticamente (no más `publish-rc` workflow_dispatch deliberado)
+- Los snapshots y RCs son **pre-releases** en GH; los finales son releases marcados `latest`
+
+### 2.3 `.github/next-bump` — el bump del próximo release
+
+Archivo en cada repo app, contenido: `minor` (default) o `major`.
+
+**Quién lo actualiza**:
+- Reusable workflow `update-next-bump.yml` (stack-agnóstico): se dispara en cada PR mergeado a develop. Si el PR tiene label `breaking-change` y el archivo dice `minor`, lo cambia a `major`, commit + push.
+- `make-release.yml`: lee el archivo, aplica el bump al último final tag para calcular el target del release, y resetea el archivo a `minor` para el próximo ciclo.
+
+**Edición manual permitida**: humanos pueden editar el archivo entre releases si la política cambió (p.ej., un breaking PR fue revertido y queremos volver a `minor`).
+
+### 2.4 Cleanup de snapshots
+
+Workflow `cleanup-snapshots.yml` (cron diario) por proyecto:
+- Conserva **últimos 3** pre-releases con tag `v*-snapshot.*` por target version
+- Borra el resto (pre-release + tag git asociado)
+- RCs y releases finales nunca se tocan
+
+### 2.5 Tag protection
+
+Reglas en cada repo app (GH Settings → Tag protection):
+- `v[0-9]*` (releases finales) → protegido contra delete y force-push
+- `v*-rc.*` (RCs) → protegido contra delete y force-push
+- `v*-snapshot.*` → libre (cleanup necesita borrarlos)
+
+---
+
+## 3. Baseline — qué hace el deploy v1 (Jenkins)
+
+> **Sección descriptiva** — captura requisitos a cubrir, no dependencias de v2.
+
+Resumen de `deploy-nexus.groovy` del repo `BQN-UY/jenkins`:
+
+**Inputs** (por webhook GWT desde GitHub Actions): `SISTEMA`, `VERSION`, `ENVIRONMENT`, `ACTOR`, `INSTALLATION`, `RESTORE`.
 
 **Flujo:**
-1. Carga `sistemas.json` desde `BQN-UY/jenkins/config/sistemas.json` (PAT GitHub).
-2. Resuelve `installations` para el `(sistema, environment)` solicitado.
-3. Notifica inicio a Google Chat (webhook).
-4. Si production → `input` manual con submitter restringido (`admins,soporte,auxiliar_soporte`).
-5. Si `RESTORE` y no production → invoca `IDS/restoreDB`.
-6. **Por cada instalación, en paralelo:**
-   - Resuelve URL exacta del artefacto en Nexus vía Search API (necesario por el sufijo Scala `_2.13` y el timestamp Maven en snapshots).
-   - Se conecta al **endpoint Portainer** correspondiente (cada instalación tiene su `portainer_endpoint` y `portainer_container`).
-   - Stop container.
-   - Descarga JAR/WAR desde Nexus a `localFile`.
-   - Copia a `deploy_path/target_name` (default `/opt/webapps`).
+1. Carga `sistemas.json`.
+2. Resuelve `installations` para el `(sistema, environment)`.
+3. Notifica inicio a Google Chat.
+4. Si production → `input` manual con submitter restringido.
+5. Si `RESTORE` → invoca `IDS/restoreDB`.
+6. Por cada instalación, paralelo:
+   - Resuelve URL del artefacto en Nexus (Search API).
+   - Stop container (Portainer API).
+   - Descarga JAR/WAR a localFile.
+   - Copia a `deploy_path/target_name`.
    - Start container.
-7. Registra el deploy en `deploy-registry` (success/failure por instalación).
-8. Notifica fin a Google Chat.
+7. Registra deploy.
+8. Notifica fin.
 
-**Dependencias técnicas:**
-- Portainer API (token `portainer_jenkins_token`).
-- Nexus (credenciales `nexus_deploy`).
-- `sistemas.json` con schema: `apps[].environments[].installations[]` con `name`, `portainer_endpoint`, `portainer_container`, `artifact.{extension, deploy_path, target_name}`, `auto_deploy`.
-- Google Chat webhook por ambiente.
-- Jenkins agents en cada `portainer_endpoint` (el `cp` corre **localmente en el host destino**, no remoto — por eso se usa `node(pEndpoint)`).
-- `deploy-registry` (servicio interno).
-- `IDS/restoreDB` (job Jenkins separado).
+**Dependencias técnicas que v2 debe replicar (con tecnologías GA-native):**
+- Acceso a Portainer (token).
+- Acceso a artefactos (en v2: `gh release download` con `GITHUB_TOKEN`).
+- Mapping `sistema → instalaciones → endpoints/containers/paths`.
+- Notificaciones (Google Chat — se mantiene).
+- Registro de deploys (en v2: GitHub Deployments API).
+- Aprobación production (en v2: GH Environments required reviewers).
 
 ---
 
-## 2. Decisiones de diseño abiertas
+## 4. Decisiones tomadas
 
-### 2.1 Self-hosted runner GA — ¿dónde y cuántos?
+### 4.1 Modelo de artefactos
+✅ Server apps usan **GitHub Releases** (no Nexus).  
+✅ Libs siguen en **Nexus** con formato Maven-standard `<base>-SNAPSHOT`.
 
-El runner GA reemplaza al "Jenkins agent" del modelo v1. Necesita:
-- Acceso de red a Portainer (todos los endpoints), Nexus, NAS2, DBs.
-- Capacidad de ejecutar `curl` + `cp` (mínimo).
-- Token efímero a GitHub (auto-gestionado por el runner).
+### 4.2 Versionado
+✅ `vX.Y.Z-snapshot.NNN` / `vX.Y.Z-rc.NNN` / `vX.Y.Z` con NNN auto-incremental.  
+✅ `.github/next-bump` con valores `minor|major`, mantenido por workflow + reseteo en make-release.  
+✅ RCs auto en push (sin workflow_dispatch separado).
+
+### 4.3 Cleanup y tag protection
+✅ Cleanup: últimos **3** snapshots por target (workflow daily).  
+✅ Tag protection: `v[0-9]*` y `v*-rc.*` protegidos; `v*-snapshot.*` libres.
+
+### 4.4 Modelo de "instalaciones" para deploy
+✅ **B + C combinados**:
+- `.github/deploy.json` (o `.yml`) en cada repo: lista de instalaciones por environment (`portainer_endpoint`, `portainer_container`, `deploy_path`, `target_name`, `auto_deploy`). Versionado con el código.
+- GH Environments por env (testing/staging/production): secrets/tokens/URLs sensibles, required reviewers para production.
+
+### 4.5 Aprobación production
+✅ GH Environments `required reviewers`.  
+🟡 Pendiente confirmar lista de submitters (mantener `admins,soporte,auxiliar_soporte` o ajustar).
+
+### 4.6 Notificaciones
+✅ Mantener Google Chat (continuidad con Soporte).
+
+### 4.7 Registro de deploys
+✅ **GitHub Deployments API** (nativo). Cada deploy crea un Deployment con env, ref, status. Sin servicio nuevo.
+
+### 4.8 Restore DB
+✅ Fuera de scope Hito 2 — se aborda en hito propio (operativos en GA, alineado con informe Jenkins §10 Fase 3).
+
+---
+
+## 5. Decisiones abiertas (input de Soporte/IDS)
+
+### 5.1 Self-hosted runner GA — ¿dónde y cuántos?
 
 | Opción | Pros | Contras |
 |---|---|---|
-| **A. Un runner único** en `DEPLOY_IP` | Mínimo a operar; ya está en red interna (acceso a todo) | SPOF; el `cp` al host destino debe ser **remoto** (SSH), no local — distinto al modelo v1 |
-| **B. Un runner por endpoint Portainer** (espejo de Jenkins agents) | `cp` local al host (igual que v1); paraleliza naturalmente | N runners a instalar/mantener (~5-10); más superficie de ataque |
-| **C. Runners "labeled"** (subset estratégico, ej. uno por DC físico) | Equilibrio: paralelismo + menos superficie | Diseñar el labeling y el routing del job; complejidad media |
+| **A. Un runner único** (en `DEPLOY_IP` u otro host) | Mínimo a operar | SPOF; el `cp` al host destino debe ser remoto (SSH) |
+| **B. Un runner por endpoint Portainer** | `cp` local; paraleliza naturalmente | N runners a mantener; más superficie |
+| **C. Runners labeled** (subset, p.ej. uno por DC) | Equilibrio paralelismo/superficie | Diseñar labeling y routing |
 
-> **Pregunta para Soporte/IDS**: ¿cuántos `portainer_endpoint` distintos hay hoy en `sistemas.json`?
-> ¿Están en el mismo DC? Si sí, A simplifica mucho. Si están distribuidos geográficamente, C es la respuesta natural.
+> **Pregunta**: ¿cuántos `portainer_endpoint` distintos hay hoy y cómo están distribuidos geográficamente?
 
-### 2.2 Mecanismo de deploy — ¿cómo llegamos al artefacto en el container?
-
-Tres caminos limpios:
+### 5.2 Mecanismo de deploy — ¿cómo llegamos al artefacto en el container?
 
 | Opción | Cómo funciona | Encaja si |
 |---|---|---|
-| **α. Portainer API** (HTTP + token) | El runner llama a Portainer para `stop` → reemplaza imagen/volumen → `start`. El artefacto se monta vía volumen Docker o se incluye en una imagen recreada. | Los containers están totalmente bajo Portainer y se pueden rebuilds/recreate por API |
-| **β. SSH + `docker pull && restart`** | El runner SSH al host, hace `docker pull` (si la imagen es la unidad) o `cp + docker restart` (si el artefacto es un archivo montado). | Hosts tienen Docker + acceso SSH desde el runner |
-| **γ. SCP + systemd** | El runner copia el JAR vía SCP, hace `systemctl restart <servicio>`. Sin Docker. | Servicios corren como units systemd directamente, sin containers |
+| **α. Portainer API** | stop → recreate via API (artefacto vía volumen Docker o rebuild de imagen) | Containers totalmente gestionados por Portainer |
+| **β. SSH + Docker** | runner SSH al host, `docker stop && cp && docker start` | Hosts tienen Docker + SSH abierto |
+| **γ. SCP + systemd** | runner SCP el JAR, `systemctl restart` | Services como units systemd, sin containers |
 
-**Importante**: v1 usa una **mezcla de α y β**: API de Portainer para start/stop + `cp` local del archivo (porque el agent corre en el host). El equivalente GA-native más cercano sería **β** (runner único, SSH al host, `docker stop && cp && docker start`) o **A+α** (runner único, todo via API de Portainer si el modelo de containers lo soporta).
+> **Pregunta**: ¿services todos containerizados? ¿JAR/WAR en volumen o dentro de la imagen?
 
-> **Pregunta para Soporte/IDS**: ¿los services corren todos containerizados via Portainer?
-> ¿El JAR/WAR se monta como volumen o está dentro de la imagen?
-> Si es volumen → β o "A+API+volumen". Si está en la imagen → α (rebuild via Portainer).
+### 5.3 Schema de `.github/deploy.json`
 
-### 2.3 Modelo de "instalaciones" — ¿dónde vive el config?
+Borrador (sujeto a refinar tras 5.1 y 5.2):
 
-Por el principio rector, v2 **no** lee `sistemas.json` de `BQN-UY/jenkins`. Necesita su propia fuente de verdad. Tres caminos:
+```json
+{
+  "environments": {
+    "testing":    { "installations": [ { "name": "...", "portainer_endpoint": "...", "portainer_container": "...", "deploy_path": "/opt/webapps", "target_name": "...", "auto_deploy": true } ] },
+    "staging":    { "installations": [ ... ] },
+    "production": { "installations": [ ... ] }
+  }
+}
+```
 
-| Opción | Implicancia |
-|---|---|
-| **A. `sistemas.json` en `BQN-UY/CI-CD`** | Single source para v2; el runner lo lee del mismo repo donde están los workflows (cero PATs cruzados). v1 sigue con su copia en `BQN-UY/jenkins` — divergen pero no se mezclan. Bueno si necesitamos vista global de instalaciones. |
-| **B. Config por proyecto** (`.github/deploy.json` o `.github/deploy.yml` en cada repo) | El repo dueño del servicio declara sus instalaciones. Descentralizado, cero registro central. Cada equipo gestiona el mapping de sus propios services. Pierde vista global pero ningún proyecto depende de otro. |
-| **C. GitHub Environments** + variables/secrets | Cada `environment` (testing/staging/production) en cada repo lleva sus `vars.PORTAINER_ENDPOINT`, `vars.DEPLOY_PATH`, `secrets.PORTAINER_TOKEN`, etc. Cero JSON, todo en GH UI. Native + auditado por GitHub. |
-
-**Recomendación inicial**: **B + C combinados**.
-- `.github/deploy.json` (o `.yml`) en cada repo → estructura: lista de instalaciones por environment, `portainer_endpoint`, `portainer_container`, `deploy_path`, `target_name`, `auto_deploy`. Versionado con el código.
-- GH Environments → secretos/tokens/URLs sensibles por ambiente. Required reviewers para production.
-
-Ventaja: ningún acoplamiento a un repo central, cero PATs cruzados, cada equipo dueño de su propio mapping. La vista global se obtiene a demanda con un script que escanee los repos via GitHub API (no es necesario tenerla pre-agregada).
+> **Pregunta**: ¿campos extra que faltan respecto a `sistemas.json` v1? ¿Algún proyecto tiene casos edge no cubiertos?
 
 ---
 
-## 3. Otras decisiones secundarias
-
-### 3.1 Aprobación de production
-- **GitHub Environments** ya provee aprobación manual (required reviewers). Mapea 1:1 al `input` de Jenkins.
-- **Pregunta**: ¿conservamos los submitters actuales (`admins,soporte,auxiliar_soporte`) como required reviewers en GH Environments?
-
-### 3.2 Notificaciones
-- v1 usa Google Chat. ¿Mantenemos? Alternativas: comentario en commit/PR, GitHub Discussions, Slack.
-- **Recomendación**: mantener Google Chat por continuidad.
-
-### 3.3 Registro de deploys
-- v1 escribe a un servicio interno (`deploy-registry`). Por el principio rector, v2 no lo invoca.
-- **Recomendación**: usar **GitHub Deployments API** (nativo) — cada deploy GA-native crea un Deployment en el repo del proyecto con env, ref y status. Auditable, queryable, sin servicio nuevo.
-- Si se requiere agregación entre repos, un dashboard externo puede leer la API de cada repo. Fuera de scope inicial.
-
-### 3.4 Resolución de URL en Nexus
-- v1 usa Nexus Search API (no asume el path) por dos razones: artifact ID con sufijo Scala `_2.13`, y timestamp Maven en snapshots.
-- **Decisión de Hito 1 + acp-api#8**: con `dynverSeparator := "-"` los paths son predecibles. ¿Sigue siendo necesaria la Search API o podemos asumir paths directos?
-
-### 3.5 Restore DB
-- v1 invoca `IDS/restoreDB`. ¿Migrar también a GA workflow_dispatch o queda fuera de Hito 2?
-- **Recomendación**: fuera de Hito 2; se aborda en su propio hito (parte de "operativos en GA" del informe Jenkins, §10 Fase 3).
-
----
-
-## 4. Criterios de aceptación del spec
+## 6. Criterios de aceptación del spec
 
 El spec se considera completo cuando responde:
 
-- [ ] (2.1) Cantidad y ubicación de runners GA + plan de instalación
-- [ ] (2.2) Mecanismo elegido (α/β/γ) + ejemplo end-to-end con un sistema real
-- [ ] (2.3) Ubicación de `sistemas.json` + schema actualizado si cambia
-- [ ] (3.1) Required reviewers de GH Environments definidos por env
-- [ ] (3.2) Notificaciones: canal y formato
-- [ ] (3.3) Registro de deploys: API y/o servicio
-- [ ] (3.4) Resolución de URL Nexus: directa vs Search API
-- [ ] Lista de secrets nuevos requeridos por el runner (Portainer, SSH keys, etc.)
-- [ ] Diseño del nuevo composite `shared/deploy-*` y reusable workflow `scala-api-deploy.yml`
-- [ ] Criterio de migración de proyectos: cómo se mueve un repo v2 publish-only a v2 con deploy GA-native (PR mecánico)
+- [ ] (5.1) Runner GA: cantidad, ubicación, plan de instalación
+- [ ] (5.2) Mecanismo de deploy elegido (α/β/γ) con ejemplo end-to-end
+- [ ] (5.3) Schema final de `.github/deploy.json`
+- [x] (4.x) Resto de decisiones tomadas
+- [ ] Lista de secrets/vars nuevos requeridos por el runner (Portainer token, SSH keys, etc.)
+- [ ] Diseño del composite `shared/deploy-*` y workflow `scala-api-deploy.yml`
+- [ ] Criterio de migración: cómo un repo v2 publish-only adopta el deploy GA-native (PR mecánico)
 
-Cuando el spec esté completo y aprobado → arranca Hito 3 (implementación).
+Cuando el spec esté completo → arranca Hito 3 (implementación).
 
 ---
 
-## 5. Próximos pasos
+## 7. Cambios al modelo v2 vigente que dispara este spec
 
-1. Compartir este borrador con Soporte/IDS para responder las preguntas de §2 y §3.
-2. Cuando estén las respuestas, actualizar este doc → consolidar en versión definitiva.
-3. Spinoff: PR en `BQN-UY/CI-CD` con el spec definitivo + ADR si corresponde.
-4. Habilitar Hito 3.
+Implementar este spec requiere cambios al CI-CD repo **antes** de tener el deploy GA-native:
+
+1. **Reescribir `scala-api-publish.yml`**: stop publishing to Nexus; create GH pre-release `v<NEXT>-snapshot.NNN` (develop) or `vX.Y.Z-rc.NNN` (release/hotfix) con JAR adjunto.
+2. **Modificar `scala-api-make-release.yml`**: stop publishing to Nexus; tag final + GH release + back-merge + bump `.github/next-bump` reset a `minor`.
+3. **Eliminar `scala-api-publish-rc.yml`** y su template (RCs son auto en push).
+4. **Crear `scala-api-cleanup-snapshots.yml`** (cron daily, conserva últimos 3 por target).
+5. **Crear reusable `update-next-bump.yml`** (stack-agnóstico, dispara en PR merged con label `breaking-change`).
+6. **Templates**: agregar `.github/next-bump` inicial, caller de cleanup, caller de update-next-bump.
+7. **Cada app que migre**: remover config Nexus de `build.sbt`, agregar `.github/next-bump`, actualizar callers.
+
+Estos cambios son **prerrequisito** del Hito 3 — sin ellos, los apps no tienen artefactos en GH Releases para que el deploy los consuma. Se ejecutan en su propio PR (no este).
+
+---
+
+## 8. Próximos pasos
+
+1. Compartir este spec con Soporte/IDS para responder §5.1, §5.2, §5.3.
+2. Cuando estén las respuestas → consolidar en este mismo PR.
+3. Mergear → habilita la ejecución de §7 y luego Hito 3.
