@@ -23,6 +23,7 @@ jobs:
     if: github.event_name == 'pull_request'
     permissions:
       issues: write
+      pull-requests: write
     steps:
       - uses: BQN-UY/CI-CD/.github/actions/shared/auto-label@v2
         with:
