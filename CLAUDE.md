@@ -44,6 +44,14 @@ docs/                 ← documentación de referencia v2
 | `hotfix/**` | staging | Fix urgente — espejo de producción |
 | `make-release` | production | Único deploy irreversible |
 
+## Convención de versionado (v2)
+
+- **Snapshots dynver** (cualquier push): `X.Y.Z-N-sha` — separador `-`, NUNCA `+` (Nexus rechaza `%2B` y SemVer ignora `+` al ordenar).
+- **Release candidate**: tag `vX.Y.Z-rc.N` creado por `scala-api-publish-rc.yml` (workflow_dispatch en release/** o hotfix/**). N arranca en 1, se autoincrementa por iteración.
+- **Release final**: tag `vX.Y.Z` creado por `scala-api-make-release.yml` al promover a producción.
+
+Cada proyecto Scala debe declarar `ThisBuild / dynverSeparator := "-"` en `build.sbt`.
+
 ## Cómo agregar una nueva action v2
 
 1. Decidir capa: ¿`shared/`, `frontend/<stack>/` o `backend/<stack>/`?

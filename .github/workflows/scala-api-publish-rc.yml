@@ -1,0 +1,95 @@
+name: Scala API · Publish RC (reusable)
+
+# Reusable workflow v2 — invocar desde el repo cliente con:
+#
+#   on:
+#     workflow_dispatch:
+#   jobs:
+#     publish-rc:
+#       uses: BQN-UY/CI-CD/.github/workflows/scala-api-publish-rc.yml@v2
+#       secrets: inherit
+#
+# Sólo se permite disparar desde release/** o hotfix/**.
+# Calcula el próximo rc.N a partir de los tags existentes para esa
+# versión base (extraída del nombre de la rama), lo crea y publica el
+# JAR a Nexus + GitHub pre-release. NO hace deploy — el deploy es
+# responsabilidad del workflow GA-native cuando esté disponible.
+
+on:
+  workflow_call:
+    inputs:
+      java-version:
+        description: Versión de Java para sbt
+        required: false
+        type: string
+        default: "21"
+
+jobs:
+  publish-rc:
+    name: Tag rc.N + publish a Nexus + GitHub pre-release
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref_name, 'release/') || startsWith(github.ref_name, 'hotfix/')
+    permissions:
+      contents: write             # crear y pushear el tag, crear el GitHub release
+    env:
+      TZ: America/Montevideo
+      NEXUS_USER: ${{ secrets.NEXUS_USER }}
+      NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # historial completo para tags y sbt-dynver
+
+      - name: Extraer versión base desde nombre de rama
+        id: base
+        shell: bash
+        run: |
+          # Soporta release/vX.Y.Z y hotfix/vX.Y.Z-descripcion
+          BASE=$(echo "${GITHUB_REF_NAME}" | grep -oP '(?<=/)v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed 's/^v//')
+          if [ -z "$BASE" ]; then
+            echo "Error: no se pudo extraer versión X.Y.Z desde '${GITHUB_REF_NAME}'. Formato esperado: release/vX.Y.Z o hotfix/vX.Y.Z-desc" >&2
+            exit 1
+          fi
+          echo "version=$BASE" >> "$GITHUB_OUTPUT"
+
+      - name: Calcular próximo rc.N
+        id: rc
+        shell: bash
+        env:
+          BASE: ${{ steps.base.outputs.version }}
+        run: |
+          set -euo pipefail
+          git fetch --tags --prune
+          LAST_N=$(git tag --list "v${BASE}-rc.*" \
+            | sed -n "s/^v${BASE}-rc\.\([0-9]\+\)$/\1/p" \
+            | sort -n | tail -1)
+          NEXT=$(( ${LAST_N:-0} + 1 ))
+          TAG="v${BASE}-rc.${NEXT}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Próximo RC: $TAG (anterior: ${LAST_N:-ninguno})" >&2
+
+      - name: Crear y pushear tag RC
+        shell: bash
+        env:
+          TAG: ${{ steps.rc.outputs.tag }}
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "Release candidate $TAG"
+          git push origin "$TAG"
+
+      - uses: BQN-UY/CI-CD/.github/actions/backend/scala/lint-build@v2
+        with:
+          java-version: ${{ inputs.java-version }}
+
+      - name: Publish RC JAR → Nexus
+        shell: bash
+        run: sbt publish
+
+      - name: GitHub pre-release
+        uses: BQN-UY/CI-CD/.github/actions/shared/github-release@v2
+        with:
+          tag: ${{ steps.rc.outputs.tag }}
+          prerelease: "true"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
