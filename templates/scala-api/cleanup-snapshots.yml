@@ -1,0 +1,21 @@
+name: Cleanup snapshots
+
+# Borra GH pre-releases 'v*-snapshot.*' viejos, conservando los últimos 3
+# por target version. No toca releases finales ni RCs.
+
+on:
+  schedule:
+    - cron: "30 6 * * *"   # daily 06:30 UTC
+  workflow_dispatch:
+    inputs:
+      keep:
+        description: Cuántos snapshots conservar por target version
+        required: false
+        default: "3"
+
+jobs:
+  cleanup:
+    uses: BQN-UY/CI-CD/.github/workflows/cleanup-snapshots.yml@v2
+    secrets: inherit
+    with:
+      keep: ${{ fromJSON(inputs.keep || '3') }}

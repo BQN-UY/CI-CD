@@ -1,4 +1,4 @@
-name: Scala API · Publish snapshot (reusable)
+name: Scala API · Publish (reusable)
 
 # Reusable workflow v2 — invocar desde el repo cliente con:
 #
@@ -10,9 +10,13 @@ name: Scala API · Publish snapshot (reusable)
 #       uses: BQN-UY/CI-CD/.github/workflows/scala-api-publish.yml@v2
 #       secrets: inherit
 #
-# Publica el JAR snapshot a Nexus. NO hace deploy — el deploy es
-# responsabilidad del workflow GA-native cuando esté disponible
-# (ver docs/v2-sin-jenkins-roadmap.md, Hito 3).
+# Crea un tag + GH pre-release por cada push:
+#   - develop       → v<NEXT>-snapshot.NNN   (NEXT = last_final + bump de .github/next-bump)
+#   - release/**    → vX.Y.Z-rc.NNN          (X.Y.Z extraído del nombre de rama)
+#   - hotfix/**     → vX.Y.Z-rc.NNN          (idem)
+# NNN: 3 dígitos zero-padded, auto-incremental.
+# El JAR assembly se adjunta al pre-release como <repo-name>-<version>.jar.
+# NO publica a Nexus (server apps usan GH Releases, ver docs/v2-hito2-deploy-spec.md).
 
 on:
   workflow_call:
@@ -25,23 +29,126 @@ on:
 
 jobs:
   publish:
-    name: Publish JAR snapshot → Nexus
+    name: Build + GH pre-release
     runs-on: ubuntu-latest
+    permissions:
+      contents: write             # crear tag y release
     env:
       TZ: America/Montevideo
-      NEXUS_USER: ${{ secrets.NEXUS_USER }}
-      NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0          # sbt-dynver necesita historial Git completo
+          fetch-depth: 0          # historial completo para tags
+
+      - name: Calcular tag
+        id: tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --tags --prune
+
+          BRANCH="${GITHUB_REF_NAME}"
+
+          if [ "$BRANCH" = "develop" ]; then
+            # Leer bump desde .github/next-bump (default: minor)
+            BUMP=$(cat .github/next-bump 2>/dev/null | tr -d '[:space:]' || true)
+            BUMP=${BUMP:-minor}
+            if [ "$BUMP" != "minor" ] && [ "$BUMP" != "major" ]; then
+              echo "Error: .github/next-bump contiene '$BUMP'; debe ser 'minor' o 'major'" >&2
+              exit 1
+            fi
+
+            # Último tag final (vX.Y.Z exacto, sin sufijos)
+            LAST=$(git tag --list 'v[0-9]*' --sort=-version:refname \
+                    | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1 || true)
+            LAST=${LAST:-v0.0.0}
+            V=${LAST#v}
+            IFS='.' read -r MAJOR MINOR PATCH <<< "$V"
+
+            case "$BUMP" in
+              minor) MINOR=$((MINOR+1)); PATCH=0 ;;
+              major) MAJOR=$((MAJOR+1)); MINOR=0; PATCH=0 ;;
+            esac
+            TARGET="$MAJOR.$MINOR.$PATCH"
+            PREFIX="v${TARGET}-snapshot"
+
+          elif [[ "$BRANCH" == release/* ]] || [[ "$BRANCH" == hotfix/* ]]; then
+            # Extraer vX.Y.Z del nombre de rama (release/v1.3.0 o hotfix/v1.3.1-desc)
+            TARGET=$(echo "$BRANCH" | grep -oP '(?<=/)v?[0-9]+\.[0-9]+\.[0-9]+' \
+                      | head -1 | sed 's/^v//' || true)
+            if [ -z "$TARGET" ]; then
+              echo "Error: no se pudo extraer versión X.Y.Z de '$BRANCH'. Formato esperado: release/vX.Y.Z o hotfix/vX.Y.Z-desc" >&2
+              exit 1
+            fi
+            PREFIX="v${TARGET}-rc"
+
+          else
+            echo "Error: rama '$BRANCH' no soportada. Este workflow sólo corre en develop, release/** o hotfix/**." >&2
+            exit 1
+          fi
+
+          # Calcular próximo NNN
+          LAST_N=$(git tag --list "${PREFIX}.*" \
+                    | sed -n "s|^${PREFIX}\.\([0-9]\+\)\$|\1|p" \
+                    | sort -n | tail -1 || true)
+          NEXT=$(( ${LAST_N:-0} + 1 ))
+          NNN=$(printf "%03d" "$NEXT")
+          TAG="${PREFIX}.${NNN}"
+
+          echo "target=$TARGET"      >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG"             >> "$GITHUB_OUTPUT"
+          echo "Próximo tag: $TAG (anterior NNN: ${LAST_N:-ninguno})" >&2
+
+      - name: Crear y pushear tag
+        shell: bash
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "Build $TAG"
+          git push origin "$TAG"
 
       - uses: BQN-UY/CI-CD/.github/actions/backend/scala/lint-build@v2
         with:
           java-version: ${{ inputs.java-version }}
 
-      - name: Publish snapshot to Nexus
+      - name: sbt assembly
         shell: bash
-        run: sbt publish
+        run: sbt assembly
+
+      - name: Localizar y renombrar JAR
+        id: jar
+        shell: bash
         env:
-          NEXUS_URL: ${{ secrets.NEXUS_URL }}
+          TAG: ${{ steps.tag.outputs.tag }}
+          REPO_NAME: ${{ github.event.repository.name }}
+        run: |
+          set -euo pipefail
+          # Buscar el JAR assembly (excluir sources y javadoc)
+          JAR=$(find target -maxdepth 3 -type f -name '*.jar' \
+                  ! -name '*-sources.jar' ! -name '*-javadoc.jar' \
+                  | head -1)
+          if [ -z "$JAR" ] || [ ! -f "$JAR" ]; then
+            echo "Error: no se encontró JAR assembly en target/" >&2
+            exit 1
+          fi
+          # Nombre de salida determinístico: <repo>-<version>.jar
+          VERSION=${TAG#v}
+          DEST="${RUNNER_TEMP}/${REPO_NAME}-${VERSION}.jar"
+          cp "$JAR" "$DEST"
+          echo "path=$DEST"     >> "$GITHUB_OUTPUT"
+          echo "JAR publicado como $(basename "$DEST")" >&2
+
+      - name: Crear GH pre-release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.tag.outputs.tag }}
+          JAR: ${{ steps.jar.outputs.path }}
+        run: |
+          set -euo pipefail
+          gh release create "$TAG" "$JAR" \
+            --prerelease \
+            --generate-notes \
+            --title "$TAG"

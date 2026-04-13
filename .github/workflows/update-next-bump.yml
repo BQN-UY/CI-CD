@@ -1,0 +1,70 @@
+name: Update next-bump (reusable)
+
+# Reusable workflow v2 — stack-agnóstico — invocar desde el repo cliente con:
+#
+#   on:
+#     pull_request:
+#       types: [closed]
+#       branches: [develop]
+#   jobs:
+#     update-next-bump:
+#       if: github.event.pull_request.merged == true
+#       uses: BQN-UY/CI-CD/.github/workflows/update-next-bump.yml@v2
+#       secrets: inherit
+#
+# Cuando un PR con label 'breaking-change' se mergea a develop, escala
+# .github/next-bump de 'minor' a 'major'. Si ya está en 'major', no-op.
+# No hace nada para PRs sin el label. Reseteo a 'minor' lo hace make-release.
+
+on:
+  workflow_call:
+
+jobs:
+  update:
+    name: Update .github/next-bump si el PR es breaking-change
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write             # commitear el cambio a develop
+    steps:
+      - name: Detectar label breaking-change
+        id: check
+        shell: bash
+        env:
+          LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+        run: |
+          set -euo pipefail
+          if echo "$LABELS" | grep -qw '"breaking-change"'; then
+            echo "is_breaking=true"  >> "$GITHUB_OUTPUT"
+            echo "PR tiene label 'breaking-change' — escalar next-bump a major"
+          else
+            echo "is_breaking=false" >> "$GITHUB_OUTPUT"
+            echo "PR sin label 'breaking-change' — nada que hacer"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.check.outputs.is_breaking == 'true'
+        with:
+          ref: develop
+          fetch-depth: 0
+
+      - name: Actualizar .github/next-bump a 'major'
+        if: steps.check.outputs.is_breaking == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          CURRENT=""
+          [ -f .github/next-bump ] && CURRENT=$(cat .github/next-bump | tr -d '[:space:]')
+          CURRENT=${CURRENT:-minor}
+
+          if [ "$CURRENT" = "major" ]; then
+            echo ".github/next-bump ya está en 'major'; no-op."
+            exit 0
+          fi
+
+          mkdir -p .github
+          echo "major" > .github/next-bump
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .github/next-bump
+          git commit -m "chore: escalar .github/next-bump a 'major' (breaking-change en PR #${{ github.event.pull_request.number }})"
+          git push origin develop

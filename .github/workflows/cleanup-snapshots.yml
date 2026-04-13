@@ -1,0 +1,90 @@
+name: Cleanup snapshots (reusable)
+
+# Reusable workflow v2 — stack-agnóstico — invocar desde el repo cliente con:
+#
+#   on:
+#     schedule:
+#       - cron: "30 6 * * *"   # daily 06:30 UTC
+#     workflow_dispatch:
+#   jobs:
+#     cleanup:
+#       uses: BQN-UY/CI-CD/.github/workflows/cleanup-snapshots.yml@v2
+#       secrets: inherit
+#
+# Lista los GH releases del repo, filtra los tags 'v*-snapshot.*', agrupa
+# por target version (la X.Y.Z entre la 'v' y '-snapshot'), y dentro de cada
+# grupo conserva los últimos 'keep' por NNN (3 por default). Borra release + tag
+# del resto. Nunca toca tags 'v[0-9]*' (finales) ni 'v*-rc.*' (RCs auditados).
+
+on:
+  workflow_call:
+    inputs:
+      keep:
+        description: Cuántos snapshots conservar por target version
+        required: false
+        type: number
+        default: 3
+
+jobs:
+  cleanup:
+    name: Borrar snapshots viejos
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write             # borrar releases y tags
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cleanup
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          KEEP: ${{ inputs.keep }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          # 1) Listar todos los releases del repo con tag 'v*-snapshot.*'
+          #    Usamos --limit alto para cubrir repos con muchos snapshots acumulados.
+          echo "Listando releases de $REPO..."
+          SNAPSHOTS=$(gh release list --repo "$REPO" --limit 1000 \
+            --json tagName,createdAt \
+            --jq '.[] | select(.tagName | test("^v[0-9]+\\.[0-9]+\\.[0-9]+-snapshot\\.[0-9]+$")) | .tagName')
+
+          if [ -z "$SNAPSHOTS" ]; then
+            echo "No hay snapshots para cleanup."
+            exit 0
+          fi
+
+          # 2) Agrupar por target version (la X.Y.Z entre 'v' y '-snapshot')
+          #    y ordenar por NNN desc. Conservar los primeros KEEP, borrar el resto.
+          echo "$SNAPSHOTS" | sort -V -r > /tmp/all.txt
+
+          # Obtener grupos únicos de target
+          TARGETS=$(echo "$SNAPSHOTS" | sed -E 's/^(v[0-9]+\.[0-9]+\.[0-9]+)-snapshot\.[0-9]+$/\1/' | sort -u)
+
+          DELETED_COUNT=0
+          KEPT_COUNT=0
+          for target in $TARGETS; do
+            echo ""
+            echo "== Target: $target =="
+            # Listar snapshots de este target, ordenados por NNN desc
+            IN_TARGET=$(grep -E "^${target}-snapshot\\.[0-9]+$" /tmp/all.txt \
+                          | sort -t. -k3,3 -n -r)
+            i=0
+            while IFS= read -r tag; do
+              [ -z "$tag" ] && continue
+              i=$((i+1))
+              if [ "$i" -le "$KEEP" ]; then
+                echo "  KEEP  $tag"
+                KEPT_COUNT=$((KEPT_COUNT+1))
+              else
+                echo "  DROP  $tag"
+                # Borrar release (y tag)
+                gh release delete "$tag" --repo "$REPO" --yes --cleanup-tag
+                DELETED_COUNT=$((DELETED_COUNT+1))
+              fi
+            done <<< "$IN_TARGET"
+          done
+
+          echo ""
+          echo "Resumen: conservados $KEPT_COUNT, borrados $DELETED_COUNT."
