@@ -44,13 +44,10 @@ jobs:
             "size/xl|d93f0b|>1000 líneas o >100 archivos"
           )
 
+          # --force crea o actualiza (color + descripción) en una sola llamada,
+          # evitando el problema de paginación al listar labels existentes.
           for entry in "${labels[@]}"; do
             IFS='|' read -r name color desc <<< "$entry"
-            if gh label list --limit 200 --json name --jq '.[].name' | grep -Fxq "$name"; then
-              echo "Updating label: $name"
-              gh label edit "$name" --color "$color" --description "$desc"
-            else
-              echo "Creating label: $name"
-              gh label create "$name" --color "$color" --description "$desc"
-            fi
+            echo "Syncing label: $name"
+            gh label create "$name" --color "$color" --description "$desc" --force
           done
