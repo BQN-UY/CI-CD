@@ -44,6 +44,10 @@ jobs:
     permissions:
       contents: write             # requerido para crear tags y hacer push de ramas
       security-events: write      # requerido para subir SARIF al tab de Security
+    env:
+      TZ: America/Montevideo
+      NEXUS_USER: ${{ secrets.NEXUS_USER }}
+      NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
         with:

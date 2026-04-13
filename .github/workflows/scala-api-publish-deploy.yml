@@ -29,6 +29,10 @@ jobs:
     name: Publish JAR snapshot → Nexus + deploy testing/staging
     runs-on: ubuntu-latest
     environment: ${{ startsWith(github.ref, 'refs/heads/hotfix/') && 'staging' || 'testing' }}
+    env:
+      TZ: America/Montevideo
+      NEXUS_USER: ${{ secrets.NEXUS_USER }}
+      NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
         with:
