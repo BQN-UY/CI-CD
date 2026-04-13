@@ -16,10 +16,12 @@ runs:
         java-version: ${{ inputs.java-version }}
         cache: sbt
 
-    - name: Setup sbt
-      uses: sbt/setup-sbt@v1
+    - name: Setup sbt (vía coursier)
+      # sbt/setup-sbt@v1 está roto: descarga zips vacíos desde release-assets.githubusercontent.com.
+      # Coursier instala sbt sin pasar por ese endpoint.
+      uses: coursier/setup-action@v1
       with:
-        sbt-runner-version: "1.11.6"   # 1.12.8 (default) tiene release roto upstream — pinear hasta que se resuelva
+        apps: sbt
 
     - name: Format check (scalafmt)
       shell: bash
