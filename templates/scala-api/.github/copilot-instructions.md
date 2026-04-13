@@ -1,9 +1,14 @@
 # Copilot instructions — Scala API (CI/CD v2)
 
+> **Doc canónico**: `BQN-UY/CI-CD/docs/v2-hito2-deploy-spec.md`. Si hay conflicto, ese gana.
+
 ## CI/CD
 
-Este proyecto usa CI/CD v2 de BQN-UY. No agregar lógica de build o deploy
-directamente en los workflows — todo se delega a actions de `BQN-UY/CI-CD`.
+Este proyecto usa CI/CD v2 de BQN-UY. No agregar lógica de build o deploy directamente en los workflows — todo se delega a actions de `BQN-UY/CI-CD`.
+
+## Tipo de proyecto
+
+**Server app** — los artefactos van a **GitHub Releases** del propio repo (NO a Nexus). Cada build crea un Release/Pre-release con el JAR adjunto.
 
 ## Branching model
 
@@ -33,38 +38,37 @@ directamente en los workflows — todo se delega a actions de `BQN-UY/CI-CD`.
 - Fixes durante un release → `fix/*` desde `release/vX.Y.Z`, PR hacia `release/vX.Y.Z`, NUNCA hacia `develop`
 - `dependabot/*` y `scala-steward/*` apuntan siempre a `develop` — nunca a `release/**` ni `hotfix/**`
 - `hotfix/**` = exclusivo para fixes de la versión en producción
-- `deploy-action` = el PR requiere acción manual en infra antes/durante el deploy (nueva env var, migración DB, nuevo secret, nuevo componente). Reemplaza al label de tipo — describir el cambio en el cuerpo del PR
+- `breaking-change` label: marca que el próximo release necesita major bump (workflow lo registra en `.github/next-bump`)
+- `deploy-action` = el PR requiere acción manual en infra antes/durante el deploy. Reemplaza al label de tipo — describir en cuerpo del PR.
 
-## Ambientes
+## Versionado
 
-| Rama | Ambiente |
-|---|---|
-| `develop`, `release/**` | testing |
-| `hotfix/**` | staging |
-| `make-release` | production |
+| Trigger | Tag GH | Tipo | Ambiente del deploy |
+|---|---|---|---|
+| push `develop` | `v<NEXT>-snapshot.NNN` | pre-release | testing |
+| push `release/vX.Y.Z` | `vX.Y.Z-rc.NNN` | pre-release | staging |
+| push `hotfix/vX.Y.Z-desc` | `vX.Y.Z-rc.NNN` | pre-release | staging |
+| `make-release` (manual) | `vX.Y.Z` | release final | production (manual) |
 
-## Secrets y variables de deploy
+- NNN: 3 dígitos zero-padded, auto-incrementa
+- `<NEXT>` = `last_final_tag + bump`, donde `bump` viene de `.github/next-bump` (default `minor`, cambia a `major` en PR con label `breaking-change`)
 
-```
-# Org-level (BQN-UY) — no configurar por repo
-JENKINS_DEPLOY_URL              # URL base del webhook GWT
-JENKINS_DEPLOY_TESTING_TOKEN    # token → rutea a deploy-nexus-testing
-JENKINS_DEPLOY_STAGING_TOKEN    # token → rutea a deploy-nexus-staging
-JENKINS_DEPLOY_PRODUCTION_TOKEN # token → rutea a deploy-nexus-production
+## Tag protection (configurar en GH Settings)
 
-# Repo-level variable
-vars.SISTEMA   # nombre del servicio (ej. payments-api)
-```
+- `v[0-9]*` → protegido (releases finales inmutables)
+- `v*-rc.*` → protegido (RCs auditados inmutables)
+- `v*-snapshot.*` → libre (cleanup workflow borra)
 
-## Secrets de Nexus
+## Secrets
 
-```
-NEXUS_USER / NEXUS_PASSWORD / NEXUS_URL
-```
+Para server apps no se requieren secrets especiales — el `GITHUB_TOKEN` que GitHub provee automáticamente alcanza para publish y deploy GA-native (cuando exista).
 
 ## Qué NO hacer
 
-- No modificar la lógica interna de los workflows en `.github/workflows/`
-- No usar nombres de secrets distintos a los documentados
+- No modificar la lógica interna de los workflows en `.github/workflows/` — son callers cortos al reusable
+- No publicar a Nexus desde este repo (server apps van a GH Releases)
+- No declarar `dynverSeparator` ni `dynverSonatypeSnapshots` en `build.sbt` (son para libs)
+- No usar secrets `JENKINS_DEPLOY_*` ni `NEXUS_*` (no aplican en v2 server apps)
 - No commitear fixes de release en `develop`
 - No ejecutar `make-release` sin haber validado en testing primero
+- No borrar tags `v[0-9]*` ni `v*-rc.*`

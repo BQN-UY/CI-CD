@@ -1,16 +1,42 @@
 # Copilot instructions — BQN-UY/CI-CD
 
+> **Doc canónico**: `docs/v2-hito2-deploy-spec.md`. Si hay conflicto, ese gana.
+
 ## Qué es este repo
 
-Repositorio centralizado de CI/CD. Las composite actions v2 viven en `.github/actions/`.
-Los reusable workflows v1 (legacy) viven en `.github/workflows/` — no modificar.
+Repositorio centralizado de CI/CD. Composite actions v2 viven en `.github/actions/`. Reusable workflows v2 (con prefijo `<stack>-`) viven en `.github/workflows/`. Workflows sin prefijo en `.github/workflows/` son **v1 legacy** — no modificar.
+
+## Principio rector v2
+
+**v2 NO depende de `BQN-UY/jenkins`.** Workflows v2 nuevos NO invocan `jenkins-deploy-trigger`, NO leen `sistemas.json`, NO usan secrets `JENKINS_DEPLOY_*`. El composite `shared/jenkins-deploy-trigger` se conserva sólo por compatibilidad con repos en v1.
 
 ## Reglas estrictas
 
-- Solo modificar `.github/actions/`, `templates/` y `docs/`
-- NUNCA tocar `.github/workflows/` (legacy v1)
-- Los workflows de proyecto no viven aquí — viven en cada repo de proyecto
-- Ambientes válidos en jenkins-deploy-trigger: `testing`, `staging`, `production`
+- Modificar: `.github/actions/`, `.github/workflows/<stack>-*.yml`, `templates/`, `docs/`
+- NO tocar workflows en `.github/workflows/` sin prefijo `<stack>-` (v1 legacy)
+- Los workflows ejecutables de cada proyecto NO viven aquí — viven en cada repo y son callers cortos al reusable
+
+## Tres grupos de proyectos
+
+| Grupo | Storage | Versionado |
+|---|---|---|
+| Server apps (APIs/WARs/python) | **GH Releases** | `v<NEXT>-snapshot.NNN`, `vX.Y.Z-rc.NNN`, `vX.Y.Z` |
+| Client apps (BPos/GPos/IDH) | TBD (probablemente GH Releases) | TBD |
+| Libs (scala libs) | **Nexus** | `<base>-SNAPSHOT` Maven-standard |
+
+## Versionado v2 server apps
+
+- push develop → `v<NEXT>-snapshot.NNN` (NEXT = last_final + bump leído de `.github/next-bump`)
+- push release/hotfix → `vX.Y.Z-rc.NNN` (auto en push, NO hay workflow_dispatch publish-rc)
+- make-release → `vX.Y.Z` (final, marcado `latest`)
+- NNN: 3 dígitos zero-padded, auto-incrementa
+- Cleanup: workflow daily conserva últimos 3 snapshots por target
+
+## Tag protection en repos app
+
+- `v[0-9]*` → protegido (releases finales inmutables)
+- `v*-rc.*` → protegido (RCs auditados inmutables)
+- `v*-snapshot.*` → libre (cleanup borra)
 
 ## Estructura de una action v2
 
@@ -18,20 +44,28 @@ Los reusable workflows v1 (legacy) viven en `.github/workflows/` — no modifica
 .github/actions/<capa>/<stack>/<nombre>/action.yml
 ```
 
-Capas: `shared/` (agnóstico de stack) | `frontend/<stack>/` | `backend/<stack>/`
+Capas: `shared/` (agnóstico) | `frontend/<stack>/` | `backend/<stack>/`
 
-## Semántica de ambientes
+## Ambientes (deploy v2 server apps, vía GA-native cuando esté listo)
 
 | Rama | Ambiente |
 |---|---|
-| `develop`, `release/**` | testing |
-| `hotfix/**` | staging |
+| `develop` | testing |
+| `release/**`, `hotfix/**` | staging |
 | `make-release` | production |
 
-## Secrets y variables de deploy
+## Para libs (Maven en Nexus)
 
-Org-level (BQN-UY): `JENKINS_DEPLOY_URL`, `JENKINS_DEPLOY_TESTING_TOKEN`, `JENKINS_DEPLOY_STAGING_TOKEN`, `JENKINS_DEPLOY_PRODUCTION_TOKEN`
+Las libs siguen modelo standard. Cada `build.sbt` debe declarar:
+```scala
+ThisBuild / dynverSeparator         := "-"
+ThisBuild / dynverSonatypeSnapshots := true
+```
 
-Repo-level variable: `vars.SISTEMA` (nombre del servicio, ej. `payments-api`)
+Apps NO usan estas settings (no publican a Nexus).
 
-El token va como `?token=` en la URL — GWT lo usa para rutear al job Jenkins correcto. Ver `docs/jenkins.md`.
+## Referencia
+
+- Spec canónico: `docs/v2-hito2-deploy-spec.md`
+- Roadmap sin Jenkins: `docs/v2-sin-jenkins-roadmap.md`
+- Catálogo workflows: `docs/migration-v2.md`
