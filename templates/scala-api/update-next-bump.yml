@@ -1,0 +1,15 @@
+name: Update next-bump
+
+# Cuando un PR con label 'breaking-change' se mergea a develop, escala
+# .github/next-bump de 'minor' a 'major'. Reseteo a 'minor' lo hace make-release.
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [develop]
+
+jobs:
+  update-next-bump:
+    if: github.event.pull_request.merged == true
+    uses: BQN-UY/CI-CD/.github/workflows/update-next-bump.yml@v2
+    secrets: inherit
