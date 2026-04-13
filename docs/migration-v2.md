@@ -171,7 +171,11 @@ A partir de v2, además de las composite actions, hay **reusable workflows** que
 
 Convención v2:
 
-- **Snapshots dynver** (cualquier push a `develop`/`release/**`/`hotfix/**`): `X.Y.Z-N-sha` con separador `-`. Cada proyecto Scala debe declarar `ThisBuild / dynverSeparator := "-"` en `build.sbt` — el default `+` es rechazado por Nexus (URL-encoded `%2B`) y SemVer 2.0.0 lo trata como build-metadata ignorado al ordenar.
+- **Snapshots dynver** (cualquier push a `develop`/`release/**`/`hotfix/**`): `X.Y.Z-SNAPSHOT` (formato Maven). Cada proyecto Scala debe declarar en `build.sbt`:
+  ```scala
+  ThisBuild / dynverSeparator         := "-"   // evita '+' rechazado por Nexus (%2B) e ignorado por SemVer
+  ThisBuild / dynverSonatypeSnapshots := true  // produce 'X.Y.Z-SNAPSHOT' entre tags (requerido por maven-snapshots)
+  ```
 - **Release candidate**: tag `vX.Y.Z-rc.N` creado por `scala-api-publish-rc.yml`. La iteración `N` se calcula automáticamente: si no hay tags previos para esa versión base arranca en `1`, si existen `rc.1`, `rc.2`, … crea el siguiente. Publica el JAR a Nexus y crea un GitHub pre-release.
 - **Release final**: tag `vX.Y.Z` creado por `scala-api-make-release.yml`. Publica el JAR a Nexus, crea el GitHub release marcado como `latest`, hace back-merge a develop. Los `rc.N` previos quedan como pre-releases en el historial.
 

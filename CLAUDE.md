@@ -46,11 +46,16 @@ docs/                 ← documentación de referencia v2
 
 ## Convención de versionado (v2)
 
-- **Snapshots dynver** (cualquier push): `X.Y.Z-N-sha` — separador `-`, NUNCA `+` (Nexus rechaza `%2B` y SemVer ignora `+` al ordenar).
+- **Snapshots dynver** (cualquier push entre tags): `X.Y.Z-SNAPSHOT` (formato Maven). El repo Nexus `maven-snapshots` requiere el sufijo `-SNAPSHOT`.
 - **Release candidate**: tag `vX.Y.Z-rc.N` creado por `scala-api-publish-rc.yml` (workflow_dispatch en release/** o hotfix/**). N arranca en 1, se autoincrementa por iteración.
 - **Release final**: tag `vX.Y.Z` creado por `scala-api-make-release.yml` al promover a producción.
 
-Cada proyecto Scala debe declarar `ThisBuild / dynverSeparator := "-"` en `build.sbt`.
+Cada proyecto Scala debe declarar en `build.sbt`:
+
+```scala
+ThisBuild / dynverSeparator         := "-"   // evita '+' (Nexus rechaza %2B; SemVer lo ignora al ordenar)
+ThisBuild / dynverSonatypeSnapshots := true  // formato Maven '<base>-SNAPSHOT' entre tags
+```
 
 ## Cómo agregar una nueva action v2
 
