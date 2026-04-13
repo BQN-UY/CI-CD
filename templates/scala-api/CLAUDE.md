@@ -1,7 +1,14 @@
 # CI/CD v2 — Contexto para AI
 
-Este proyecto usa CI/CD v2 de BQN-UY. Las actions reutilizables viven en
-`BQN-UY/CI-CD`. Los workflows de este proyecto viven en `.github/workflows/`.
+Este proyecto usa CI/CD v2 de BQN-UY. La lógica de CI/CD vive en `BQN-UY/CI-CD`
+como **reusable workflows** (`.github/workflows/scala-api-*.yml`) que internamente
+componen las composite actions del repo. Los workflows de este proyecto son
+**callers cortos** que apuntan al reusable workflow correspondiente con `@v2`.
+
+Esto significa que cualquier cambio en la lógica de CI/CD se hace una sola vez
+en `BQN-UY/CI-CD` y se propaga automáticamente a todos los proyectos que pinean
+`@v2`. Los archivos `.github/workflows/*.yml` de este repo solo cambian cuando
+hay que ajustar inputs o triggers específicos del proyecto.
 
 ## Branching model
 
@@ -67,6 +74,9 @@ Este proyecto usa CI/CD v2 de BQN-UY. Las actions reutilizables viven en
 | `start-release.yml` | manual (workflow_dispatch) | crea `release/vX.Y.Z` desde develop |
 | `make-release.yml` | manual (workflow_dispatch) | tag + Nexus release + GitHub Release + deploy production + back-merge |
 | `start-hotfix.yml` | manual (workflow_dispatch) | crea `hotfix/vX.Y.Z-desc` desde main |
+| `setup-labels.yml` | manual (workflow_dispatch) | crea/sincroniza las labels estándar (tipo + `size/*`) — correr al inicializar el repo |
+
+> Las labels `size/xs..xl` son informativas y las asigna automáticamente `pr-size-label` en cada PR según líneas y archivos modificados. No reemplazan al label de tipo — `label-check` sigue exigiendo exactamente una de `feature` / `fix` / `chore` / `update` / `deploy-action` / `breaking-change`.
 
 ## Secrets y variables requeridos
 

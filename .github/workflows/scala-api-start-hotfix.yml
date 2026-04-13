@@ -1,0 +1,60 @@
+name: Scala API · Start Hotfix (reusable)
+
+# Reusable workflow v2 — invocar desde el repo cliente con:
+#
+#   on:
+#     workflow_dispatch:
+#       inputs:
+#         description:
+#           description: Descripción corta del bug (ej. fix-null-parser)
+#           required: true
+#   jobs:
+#     start-hotfix:
+#       uses: BQN-UY/CI-CD/.github/workflows/scala-api-start-hotfix.yml@v2
+#       secrets: inherit
+#       with:
+#         description: ${{ inputs.description }}
+
+on:
+  workflow_call:
+    inputs:
+      description:
+        description: Descripción corta del bug (ej. fix-null-parser)
+        required: true
+        type: string
+
+jobs:
+  start-hotfix:
+    # main == último tag de release: make-release siempre mergea a main y crea
+    # el tag en ese mismo commit. Partir de main es partir del estado de producción.
+    name: Crear hotfix branch desde main
+    runs-on: ubuntu-latest
+    if: github.ref_name == 'main'
+    permissions:
+      contents: write             # requerido para crear y pushear la rama
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - name: Calcular versión patch
+        id: semver
+        uses: BQN-UY/CI-CD/.github/actions/shared/semver-tag@v2
+        with:
+          bump: patch
+          dry-run: "true"
+
+      - name: Crear hotfix branch
+        shell: bash
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          DESCRIPTION=$(echo "${{ inputs.description }}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g' | sed 's/--*/-/g' | sed 's/^-//;s/-$//')
+          if [ -z "$DESCRIPTION" ]; then
+            echo "Error: description quedó vacía tras sanitizar. Usar solo letras, números y guiones." >&2
+            exit 1
+          fi
+          BRANCH="hotfix/${{ steps.semver.outputs.tag }}-${DESCRIPTION}"
+          git checkout -b "$BRANCH"
+          git push origin "$BRANCH"

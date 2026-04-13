@@ -1,0 +1,55 @@
+name: Scala API · Start Release (reusable)
+
+# Reusable workflow v2 — invocar desde el repo cliente con:
+#
+#   on:
+#     workflow_dispatch:
+#       inputs:
+#         bump:
+#           description: Tipo de bump de versión
+#           required: true
+#           default: minor
+#           type: choice
+#           options: [major, minor, patch]
+#   jobs:
+#     start-release:
+#       uses: BQN-UY/CI-CD/.github/workflows/scala-api-start-release.yml@v2
+#       secrets: inherit
+#       with:
+#         bump: ${{ inputs.bump }}
+
+on:
+  workflow_call:
+    inputs:
+      bump:
+        description: Tipo de bump de versión (major | minor | patch)
+        required: true
+        type: string
+
+jobs:
+  start-release:
+    name: Crear release branch
+    runs-on: ubuntu-latest
+    if: github.ref_name == 'develop'
+    permissions:
+      contents: write             # requerido para crear y pushear la rama
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: develop
+
+      - name: Calcular versión
+        id: semver
+        uses: BQN-UY/CI-CD/.github/actions/shared/semver-tag@v2
+        with:
+          bump: ${{ inputs.bump }}
+          dry-run: "true"         # Solo calcula, no crea el tag
+
+      - name: Crear release branch
+        shell: bash
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "release/${{ steps.semver.outputs.tag }}"
+          git push origin "release/${{ steps.semver.outputs.tag }}"
