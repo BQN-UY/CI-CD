@@ -144,6 +144,54 @@ El path del `uses:` siempre sigue el mismo patrón:
 
 ---
 
+## 2.bis Reusable workflows (`.github/workflows/<stack>-<tipo>-*.yml`)
+
+A partir de v2, además de las composite actions, hay **reusable workflows** que componen las actions y exponen un `on: workflow_call`. Esto permite que los repos cliente solo declaren un caller corto y se mantengan sincronizados automáticamente con el tag `@v2`.
+
+### Convenciones
+
+- Subcarpetas no soportadas en `.github/workflows/` → la taxonomía va en el nombre: `<stack>-<tipo>-<workflow>.yml`
+- Los reusable workflows siempre tienen `on: workflow_call`
+- Los `secrets` se pasan con `secrets: inherit` desde el caller (requiere que los nombres coincidan con los documentados en §6)
+- Las labels (tipo + tamaño) y otros workflows agnósticos usan nombre sin prefijo de stack: `setup-labels.yml`
+
+### Catálogo actual
+
+| Reusable workflow | Tipo de proyecto | Trigger del caller |
+|---|---|---|
+| `scala-api-ci.yml` | API Scala | `pull_request` + `push` release/hotfix |
+| `scala-api-publish-deploy.yml` | API Scala | `push` develop / release / hotfix |
+| `scala-api-make-release.yml` | API Scala | `workflow_dispatch` |
+| `scala-api-start-release.yml` | API Scala | `workflow_dispatch` |
+| `scala-api-start-hotfix.yml` | API Scala | `workflow_dispatch` |
+| `setup-labels.yml` | Cualquiera | `workflow_dispatch` |
+
+### Caller mínimo
+
+```yaml
+# .github/workflows/ci.yml en el repo del proyecto
+name: CI
+on:
+  pull_request:
+    branches: [develop, "release/**", "hotfix/**"]
+  push:
+    branches: ["release/**", "hotfix/**"]
+jobs:
+  ci:
+    uses: BQN-UY/CI-CD/.github/workflows/scala-api-ci.yml@v2
+    secrets: inherit
+```
+
+Los templates en `templates/<stack>-<tipo>/` ya contienen los callers listos para copiar.
+
+### Cómo agregar un nuevo stack/tipo (ej. `scala-lib`, `vaadin-war`, `python-api`)
+
+1. Crear `.github/workflows/<stack>-<tipo>-<workflow>.yml` con `on: workflow_call` componiendo las composite actions correspondientes
+2. Crear `templates/<stack>-<tipo>/` con los callers cortos
+3. Documentar en este archivo
+
+---
+
 ## 3. Actions compartidas (`shared/`)
 
 Las actions de `shared/` no contienen lógica de stack. Se usan igual desde cualquier tipo
@@ -215,7 +263,43 @@ label-check:
 
 ---
 
-### 3.3 `shared/security-scan`
+### 3.3 `shared/pr-size-label`
+
+Etiqueta el PR con su tamaño (`size/xs`, `size/s`, `size/m`, `size/l`, `size/xl`) según líneas y archivos modificados.
+Envuelve [`codelytv/pr-size-labeler`](https://github.com/CodelyTV/pr-size-labeler) con thresholds por defecto.
+
+| Tamaño | Líneas | Archivos |
+|---|---|---|
+| `size/xs` | ≤10 | ≤2 |
+| `size/s`  | ≤100 | ≤10 |
+| `size/m`  | ≤500 | ≤30 |
+| `size/l`  | ≤1000 | ≤100 |
+| `size/xl` | >1000 | >100 |
+
+Cualquier umbral es ajustable vía inputs (`xs-max-size`, `files-xs-max-size`, etc.).
+Por defecto ignora lockfiles (`package-lock.json`, `yarn.lock`, `*.lock`, `build.sbt.lock`).
+
+Requiere `permissions: pull-requests: write` en el job que la invoca.
+Se omite automáticamente en PRs desde forks (donde el token viene con permisos read-only).
+
+```yaml
+pr-size-label:
+  name: Etiquetar tamaño de PR
+  runs-on: ubuntu-latest
+  if: github.event_name == 'pull_request'
+  permissions:
+    pull-requests: write
+  steps:
+    - uses: BQN-UY/CI-CD/.github/actions/shared/pr-size-label@v2
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+```
+
+> Las labels `size/*` son informativas — `label-check` no las cuenta como label de tipo.
+
+---
+
+### 3.4 `shared/security-scan`
 
 Corre **OpenGrep** (SAST) y **BetterLeaks** (secrets scanning) sobre el código.
 Si encuentra algo, el CI falla y el PR no puede mergearse.
@@ -227,7 +311,7 @@ No requiere inputs — opera sobre el checkout actual. Para que el upload de SAR
 
 ---
 
-### 3.4 `shared/semver-tag`
+### 3.5 `shared/semver-tag`
 
 Crea un tag SemVer 2.0 anotado (no firmado con GPG). Soporta dos modos:
 
@@ -258,7 +342,7 @@ Si se requieren tags firmados con GPG, el manejo de claves y la firma deben impl
 
 ---
 
-### 3.5 `shared/git-merge`
+### 3.6 `shared/git-merge`
 
 Realiza un back-merge automático sin conflictos. Al no existir archivos de versión
 (no hay `version.sbt` ni equivalente), este paso siempre es limpio.
@@ -272,7 +356,7 @@ Realiza un back-merge automático sin conflictos. Al no existir archivos de vers
 
 ---
 
-### 3.6 `shared/github-release`
+### 3.7 `shared/github-release`
 
 Crea un GitHub Release con release notes autogeneradas a partir de los PRs incluidos
 y sus labels. Usa `softprops/action-gh-release@v2`.
@@ -285,7 +369,7 @@ y sus labels. Usa `softprops/action-gh-release@v2`.
 
 ---
 
-### 3.7 `shared/jenkins-deploy-trigger`
+### 3.8 `shared/jenkins-deploy-trigger`
 
 Dispara el deploy vía [Generic Webhook Trigger (GWT)](https://plugins.jenkins.io/generic-webhook-trigger/)
 de Jenkins. El token se envía como query param `?token=` — GWT lo usa para rutear

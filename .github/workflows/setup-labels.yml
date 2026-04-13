@@ -1,0 +1,53 @@
+name: Setup labels (reusable)
+
+# Reusable workflow v2 — agnóstico al stack. Crea/sincroniza las labels
+# estándar de BQN-UY (tipo + tamaño). Invocar manualmente desde el repo cliente:
+#
+#   on:
+#     workflow_dispatch:
+#   jobs:
+#     setup-labels:
+#       uses: BQN-UY/CI-CD/.github/workflows/setup-labels.yml@v2
+#       secrets: inherit
+
+on:
+  workflow_call:
+
+jobs:
+  sync-labels:
+    name: Sincronizar labels estándar
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Create or update labels
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          # Formato: nombre|color|descripción
+          labels=(
+            # Tipo (label-check exige exactamente una)
+            "feature|0e8a16|Nueva funcionalidad retrocompatible"
+            "fix|d93f0b|Corrección de bug"
+            "chore|fbca04|Mantenimiento: configuración, CI, tests, docs, refactor"
+            "update|1d76db|Actualización de dependencias (Dependabot / Scala Steward)"
+            "deploy-action|b60205|Requiere acción manual en infra antes/durante el deploy"
+            "breaking-change|b60205|Cambio incompatible — bump de major"
+            # Tamaño (informativas — asignadas por pr-size-label)
+            "size/xs|c2e0c6|≤10 líneas y ≤2 archivos"
+            "size/s|7ed321|≤100 líneas y ≤10 archivos"
+            "size/m|fbca04|≤500 líneas y ≤30 archivos"
+            "size/l|f2a93b|≤1000 líneas y ≤100 archivos"
+            "size/xl|d93f0b|>1000 líneas o >100 archivos"
+          )
+
+          # --force crea o actualiza (color + descripción) en una sola llamada,
+          # evitando el problema de paginación al listar labels existentes.
+          for entry in "${labels[@]}"; do
+            IFS='|' read -r name color desc <<< "$entry"
+            echo "Syncing label: $name"
+            gh label create "$name" --color "$color" --description "$desc" --force
+          done

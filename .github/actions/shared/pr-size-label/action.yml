@@ -1,0 +1,97 @@
+name: PR size label
+description: Etiqueta el PR con su tamaño (size/xs..xl) según líneas y archivos modificados
+
+inputs:
+  github-token:
+    description: GITHUB_TOKEN del repo que invoca
+    required: true
+  xs-max-size:
+    description: Máximo de líneas para size/xs
+    required: false
+    default: "10"
+  s-max-size:
+    description: Máximo de líneas para size/s
+    required: false
+    default: "100"
+  m-max-size:
+    description: Máximo de líneas para size/m
+    required: false
+    default: "500"
+  l-max-size:
+    description: Máximo de líneas para size/l (mayor → size/xl)
+    required: false
+    default: "1000"
+  files-xs-max-size:
+    description: Máximo de archivos para size/xs
+    required: false
+    default: "2"
+  files-s-max-size:
+    description: Máximo de archivos para size/s
+    required: false
+    default: "10"
+  files-m-max-size:
+    description: Máximo de archivos para size/m
+    required: false
+    default: "30"
+  files-l-max-size:
+    description: Máximo de archivos para size/l (mayor → size/xl)
+    required: false
+    default: "100"
+  fail-if-xl:
+    description: Si "true", el job falla cuando el PR es size/xl
+    required: false
+    default: "false"
+  ignore-file-deletions:
+    description: Si "true", ignora deleciones al calcular tamaño
+    required: false
+    default: "false"
+  files-to-ignore:
+    description: Lista (separada por '|') de globs de archivos a ignorar
+    required: false
+    default: "package-lock.json|yarn.lock|*.lock|build.sbt.lock"
+
+runs:
+  using: composite
+  steps:
+    - name: Skip on fork PRs
+      id: gate
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ inputs.github-token }}
+        script: |
+          const pr = context.payload.pull_request;
+          if (!pr?.head?.ref) {
+            core.setOutput('skip', 'true');
+            console.log("PR size label: contexto sin 'pull_request' — se omite.");
+            return;
+          }
+          const headRepo = pr.head.repo;
+          const thisRepoFullName = `${context.repo.owner}/${context.repo.repo}`;
+          if (!headRepo || headRepo.fork || headRepo.full_name !== thisRepoFullName) {
+            core.setOutput('skip', 'true');
+            console.log(`PR size label: PR desde fork u otro repo (${headRepo?.full_name ?? 'desconocido'}) — se omite.`);
+            return;
+          }
+          core.setOutput('skip', 'false');
+
+    - name: Apply size label
+      if: steps.gate.outputs.skip != 'true'
+      uses: codelytv/pr-size-labeler@v1
+      with:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        xs_label: size/xs
+        s_label: size/s
+        m_label: size/m
+        l_label: size/l
+        xl_label: size/xl
+        xs_max_size: ${{ inputs.xs-max-size }}
+        s_max_size: ${{ inputs.s-max-size }}
+        m_max_size: ${{ inputs.m-max-size }}
+        l_max_size: ${{ inputs.l-max-size }}
+        files_xs_max_size: ${{ inputs.files-xs-max-size }}
+        files_s_max_size: ${{ inputs.files-s-max-size }}
+        files_m_max_size: ${{ inputs.files-m-max-size }}
+        files_l_max_size: ${{ inputs.files-l-max-size }}
+        fail_if_xl: ${{ inputs.fail-if-xl }}
+        ignore_file_deletions: ${{ inputs.ignore-file-deletions }}
+        files_to_ignore: ${{ inputs.files-to-ignore }}

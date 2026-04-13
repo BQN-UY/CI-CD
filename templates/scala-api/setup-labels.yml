@@ -1,0 +1,12 @@
+name: Setup labels
+
+# Crea/sincroniza las labels estándar de BQN-UY en este repo.
+# Correr una vez al inicializar el repo (o cuando se agreguen labels nuevas).
+
+on:
+  workflow_dispatch:
+
+jobs:
+  setup-labels:
+    uses: BQN-UY/CI-CD/.github/workflows/setup-labels.yml@v2
+    secrets: inherit

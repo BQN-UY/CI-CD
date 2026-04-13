@@ -7,46 +7,8 @@ on:
     branches: ["release/**", "hotfix/**"]
 
 jobs:
-  auto-label:
-    name: Auto-label PR
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    permissions:
-      issues: write
-    steps:
-      - uses: BQN-UY/CI-CD/.github/actions/shared/auto-label@v2
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-
-  label-check:
-    name: Verificar label de PR
-    needs: auto-label
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    permissions:
-      pull-requests: read
-    steps:
-      - uses: actions/checkout@v4
-      - uses: BQN-UY/CI-CD/.github/actions/shared/label-check@v2
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-
-  lint-build:
-    name: Lint & Build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0          # sbt-dynver necesita historial Git completo
-      - uses: BQN-UY/CI-CD/.github/actions/backend/scala/lint-build@v2
-
-  security:
-    name: Security scan
-    runs-on: ubuntu-latest
-    permissions:
-      security-events: write    # requerido para subir SARIF al tab de Security
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0          # detect-secrets analiza historial completo
-      - uses: BQN-UY/CI-CD/.github/actions/shared/security-scan@v2
+  ci:
+    uses: BQN-UY/CI-CD/.github/workflows/scala-api-ci.yml@v2
+    secrets: inherit
+    # with:
+    #   java-version: "21"   # default; override solo si el proyecto usa otra versión
