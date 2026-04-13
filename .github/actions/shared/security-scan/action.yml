@@ -43,8 +43,8 @@ runs:
           }
         fi
         pip install "detect-secrets>=1.4.0,<2.0.0" --quiet
-        # Excluir .git/ (artefactos del clone) y .github/workflows/ (refs ${{ secrets.X }}
-        # que detect-secrets clasifica como high-entropy strings).
+        # Excluir .git/ (artefactos del clone) y .github/workflows/
+        # (las refs a secrets son detectadas como high-entropy strings).
         detect-secrets scan --all-files . \
           --exclude-files '^\.git/' \
           --exclude-files '^\.github/workflows/' \
