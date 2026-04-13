@@ -26,6 +26,80 @@ Características del modelo v1:
 
 ---
 
+## Mecanismo de trigger a Jenkins (v1)
+
+En v1, GitHub Actions **nunca contacta Jenkins directamente**. El flujo de deploy
+pasa por un servidor intermediario (`DEPLOY_IP`) que actúa como puente:
+
+```
+GitHub Actions (internet)
+  │
+  ├─ 1. rsync+SSH ──────────────────→ DEPLOY_IP (red interna)
+  │       transfiere el artefacto      deposita JAR/WAR en PUBLISHER_PATH
+  │
+  └─ 2. SSH ────────────────────────→ DEPLOY_IP
+          ejecuta script remoto:
+            curl /crumbIssuer/api/json   →  Jenkins (red interna)
+            curl /buildWithParameters    →  Jenkins (red interna)
+```
+
+Jenkins recibe el trigger desde `DEPLOY_IP` — un host de la red local —
+y **no necesita estar expuesto a internet** para este mecanismo.
+
+### Implementación en el workflow
+
+El paso relevante en `scala-deploy-jar.yml` y `scala-deploy-web.yml`
+es el step `Executing deploy script` usando `appleboy/ssh-action`:
+
+```yaml
+- name: Executing deploy script
+  uses: appleboy/ssh-action@master
+  with:
+    host:     ${{ secrets.DEPLOY_IP }}
+    username: ${{ secrets.DEPLOY_USER }}
+    key:      ${{ secrets.DEPLOY_KEY }}
+    port:     ${{ secrets.DEPLOY_PORT }}
+    script: |
+      crumb=$(curl -u "${{ secrets.JENKINS_USER }}:${{ secrets.JENKINS_TOKEN }}" \
+        -s '${{ secrets.JENKINS_URL }}/crumbIssuer/api/json')
+      curl -u "${{ secrets.JENKINS_USER }}:${{ secrets.JENKINS_TOKEN }}" \
+        -H "$crumb" -X POST \
+        '${{ secrets.JENKINS_URL }}/${{ secrets.JENKINS_DEPLOY_JOB }}/buildWithParameters?SISTEMA=...&VERSION=...&USER=...'
+```
+
+> **Quirk conocido de v1:** el valor que devuelve `/crumbIssuer/api/json` es un JSON
+> (`{"crumbRequestField":"...","crumb":"..."}`), pero se pasa a `-H "$crumb"` sin parsear.
+> Esto **no es un header CSRF válido** — el POST funciona porque el Jenkins destino tiene
+> la protección CSRF desactivada o relajada. En v2 con GWT este problema desaparece: GWT
+> no requiere crumb y la autorización va por token en la URL.
+
+### Secrets involucrados
+
+| Secret | Propósito |
+|---|---|
+| `DEPLOY_KEY` | Clave SSH privada para autenticar contra `DEPLOY_IP` |
+| `DEPLOY_IP` | IP del servidor intermediario |
+| `DEPLOY_PORT` | Puerto SSH del servidor intermediario |
+| `DEPLOY_USER` | Usuario SSH en el servidor intermediario |
+| `JENKINS_URL` | URL de Jenkins — accesible desde la red interna de `DEPLOY_IP` |
+| `JENKINS_DEPLOY_JOB` | Path del job Jenkins a disparar |
+| `JENKINS_USER` | Usuario de Jenkins para autenticar el trigger |
+| `JENKINS_TOKEN` | API token de Jenkins |
+| `PUBLISHER_PATH` | Path donde `DEPLOY_IP` almacena los artefactos recibidos |
+
+### Diferencia fundamental con v2
+
+En **v2**, la action `shared/jenkins-deploy-trigger` hace el POST al endpoint
+GWT de Jenkins **directamente desde el runner de GitHub Actions**, por lo que
+Jenkins debe ser alcanzable desde ese runner. Con runners GitHub-hosted esto
+típicamente implica exposición pública de Jenkins (o acceso mediante un proxy /
+conectividad equivalente); con runners self-hosted dentro de la red interna,
+Jenkins puede mantenerse en red privada como en v1.
+Ver análisis de implicaciones de seguridad en `BQN-UY/jenkins` →
+`docs/seguridad/analisis-trigger-v1-v2.md`.
+
+---
+
 ## Workflows disponibles
 
 ### `scala-ci.yml`
