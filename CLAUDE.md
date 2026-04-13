@@ -3,12 +3,14 @@
 Repositorio centralizado de CI/CD de la organización BQN-UY.
 Contiene composite actions reutilizables (v2), reusable workflows v2 y los reusable workflows heredados (v1).
 
+> **Documento canónico del modelo v2**: `docs/v2-hito2-deploy-spec.md`. Si hay conflicto entre cualquier documento y el spec, **el spec gana**. Este CLAUDE.md condensa lo operativo.
+
 ## Estructura del repo
 
 ```
 .github/
 ├── actions/          ← composite actions v2  — MODIFICAR AQUÍ
-│   ├── shared/       ← lógica agnóstica de stack (jenkins-deploy-trigger, semver-tag, etc.)
+│   ├── shared/       ← lógica agnóstica de stack (semver-tag, github-release, security-scan, etc.)
 │   ├── frontend/     ← acciones por stack frontend (html-js, vaadin, flutter)
 │   └── backend/      ← acciones por stack backend (scala, python, node)
 └── workflows/        ← convive v1 (legacy) y v2 (reusable workflows)
@@ -31,31 +33,57 @@ docs/                 ← documentación de referencia v2
 - Toda nueva action v2 va en `.github/actions/<capa>/<stack>/<nombre>/action.yml`
 - Todo nuevo reusable workflow v2 va en `.github/workflows/<stack>-<tipo>-<workflow>.yml` con `on: workflow_call`
 
-## Ambientes válidos (`shared/jenkins-deploy-trigger`)
+## Principio rector v2
 
-`testing` | `staging` | `production`
+**v2 no depende de `BQN-UY/jenkins` para nada.** Ese repo (rama `production`, scripts groovy, `sistemas.json`) queda congelado como legacy v1. Workflows v2 nuevos NO invocan `jenkins-deploy-trigger`, NO leen archivos del repo jenkins, NO referencian secrets `JENKINS_DEPLOY_*`. Ver `docs/v2-sin-jenkins-roadmap.md`.
 
-## Semántica de ambientes
+> El composite `shared/jenkins-deploy-trigger` se conserva por compatibilidad con repos aún en v1, pero NO se usa en código nuevo de v2.
+
+## Tres grupos de proyectos
+
+| Grupo | Ejemplos | Storage de artefactos | Versionado |
+|---|---|---|---|
+| **Server apps** | scala APIs, WARs, python servers | **GH Releases** del propio repo | `v<NEXT>-snapshot.NNN` / `vX.Y.Z-rc.NNN` / `vX.Y.Z` |
+| **Client apps** | BPos, GPos, IDH (firmwares) | TBD (probablemente GH Releases) | TBD por equipo |
+| **Libs** | scala libs, protocolos | **Nexus** maven-snapshots / maven-releases | `<base>-SNAPSHOT` (Maven-standard) |
+
+Detalle completo en `docs/v2-hito2-deploy-spec.md` §1.
+
+## Convención de versionado v2 (server apps)
+
+| Trigger | Tag GH | Tipo | Cleanup |
+|---|---|---|---|
+| push `develop` | `v<NEXT>-snapshot.NNN` | pre-release | sí (workflow daily, conserva últimos 3 por target) |
+| push `release/vX.Y.Z` o `hotfix/vX.Y.Z-desc` | `vX.Y.Z-rc.NNN` | pre-release | no |
+| `make-release` (workflow_dispatch) | `vX.Y.Z` | release final | no |
+
+- **NNN**: 3 dígitos zero-padded (`001`, `002`, ...), auto-incrementa por trigger
+- **`<NEXT>`**: derivada de `last_final_tag + bump`, donde `bump ∈ {minor, major}` se lee de `.github/next-bump` (default `minor`)
+- **RCs son auto en push** (no hay `publish-rc` workflow_dispatch separado)
+- `.github/next-bump` lo actualiza un workflow al merger PRs con label `breaking-change`; `make-release` lo resetea a `minor`
+
+> **NO confundir con libs**: las libs siguen el modelo Maven-standard `<base>-SNAPSHOT` en Nexus. La convención de arriba es para server apps.
+
+## Tag protection requerida en repos app
+
+| Patrón | Protegido contra | Razón |
+|---|---|---|
+| `v[0-9]*` | delete + force-push | releases finales son inmutables |
+| `v*-rc.*` | delete + force-push | RCs auditados son inmutables |
+| `v*-snapshot.*` | (libre) | cleanup workflow necesita borrarlos |
+
+## Ambientes (deploy v2 server apps)
 
 | Rama del proyecto | Ambiente | Propósito |
 |---|---|---|
-| `develop` | testing | Features de la próxima versión |
-| `release/**` | testing | Fixes del release en curso |
-| `hotfix/**` | staging | Fix urgente — espejo de producción |
-| `make-release` | production | Único deploy irreversible |
+| `develop` | testing | Features de la próxima versión (auto-deploy desde snapshot) |
+| `release/**` | staging | Validación del RC (auto-deploy desde rc) |
+| `hotfix/**` | staging | Fix urgente — espejo de producción (auto-deploy desde rc) |
+| `make-release` | production | Único deploy irreversible (manual por Soporte) |
 
-## Convención de versionado (v2)
+> Mecanismo concreto del deploy GA-native: pendiente de Hito 2/3. Ver `docs/v2-hito2-deploy-spec.md`.
 
-- **Snapshots dynver** (cualquier push entre tags): `X.Y.Z-SNAPSHOT` (formato Maven). El repo Nexus `maven-snapshots` requiere el sufijo `-SNAPSHOT`.
-- **Release candidate**: tag `vX.Y.Z-rc.N` creado por `scala-api-publish-rc.yml` (workflow_dispatch en release/** o hotfix/**). N arranca en 1, se autoincrementa por iteración.
-- **Release final**: tag `vX.Y.Z` creado por `scala-api-make-release.yml` al promover a producción.
-
-Cada proyecto Scala debe declarar en `build.sbt`:
-
-```scala
-ThisBuild / dynverSeparator         := "-"   // evita '+' (Nexus rechaza %2B; SemVer lo ignora al ordenar)
-ThisBuild / dynverSonatypeSnapshots := true  // formato Maven '<base>-SNAPSHOT' entre tags
-```
+> Composite legacy `shared/jenkins-deploy-trigger` admite ambientes `testing | staging | production` para repos aún en v1.
 
 ## Cómo agregar una nueva action v2
 
@@ -73,6 +101,8 @@ ThisBuild / dynverSonatypeSnapshots := true  // formato Maven '<base>-SNAPSHOT' 
 
 ## Referencia
 
+- **Spec canónico v2 (server apps)**: `docs/v2-hito2-deploy-spec.md`
+- Hoja de ruta v2 sin Jenkins: `docs/v2-sin-jenkins-roadmap.md`
 - Documentación completa: `docs/migration-v2.md`
 - Guía de migración Scala: `docs/scala-migration-v2.md`
 - Workflows v1 (legacy): `docs/workflows-v1.md`

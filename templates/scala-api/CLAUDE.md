@@ -40,16 +40,54 @@ hay que ajustar inputs o triggers específicos del proyecto.
 | `hotfix/vX.Y.Z-desc` | `main` via `start-hotfix` | `make-release` → `main` | Fix urgente a producción |
 | `main` | — | — | Producción |
 
-## Semántica de Nexus por rama
+## Storage y versionado de artefactos
 
-| Rama | Nexus | Propósito |
+> **Importante**: este proyecto es un **server app** — los artefactos NO van a Nexus. Cada build genera un GitHub Release/Pre-release del propio repo con el JAR adjunto. (Las libs sí van a Nexus; ver `BQN-UY/CI-CD/docs/v2-hito2-deploy-spec.md` §1.)
+
+| Trigger | Tag GH | Tipo | Cleanup | Ambiente del deploy |
+|---|---|---|---|---|
+| push `develop` | `v<NEXT>-snapshot.NNN` | pre-release | sí (workflow daily, conserva últimos 3 por target) | testing |
+| push `release/vX.Y.Z` | `vX.Y.Z-rc.NNN` | pre-release | no | staging |
+| push `hotfix/vX.Y.Z-desc` | `vX.Y.Z-rc.NNN` | pre-release | no | staging |
+| `make-release` (manual) | `vX.Y.Z` | release final | no | production (manual por Soporte) |
+
+- **NNN**: 3 dígitos zero-padded (`001`, `002`, ...), auto-incrementa por trigger
+- **`<NEXT>`**: versión target para develop, calculada como `last_final_tag + bump` donde `bump` se lee de `.github/next-bump`
+- RCs son auto en cada push a release/hotfix — no hay workflow_dispatch manual para crear RC
+
+```mermaid
+gitGraph
+    commit id: "v1.2.0" tag: "v1.2.0"
+    branch develop
+    checkout develop
+    commit id: "feat A" tag: "v1.3.0-snapshot.001"
+    commit id: "feat B" tag: "v1.3.0-snapshot.002"
+    branch release/v1.3.0
+    checkout release/v1.3.0
+    commit id: "RC" tag: "v1.3.0-rc.001"
+    commit id: "fix" tag: "v1.3.0-rc.002"
+    checkout main
+    merge release/v1.3.0 tag: "v1.3.0"
+    checkout develop
+    merge main
+    commit id: "feat C" tag: "v1.4.0-snapshot.001"
+```
+
+## `.github/next-bump`
+
+Archivo en este repo, contenido: `minor` (default) o `major`.
+
+- Cuando se mergea un PR a `develop` con label `breaking-change`, el workflow `update-next-bump.yml` lo cambia a `major` (commit + push).
+- `make-release.yml` lo lee, aplica el bump al último final tag para calcular el target del release, y lo resetea a `minor` para el próximo ciclo.
+- Edición manual permitida si la política cambió (ej. un breaking PR fue revertido).
+
+## Tag protection (configurar en GH Settings → Tag protection rules)
+
+| Patrón | Protegido contra | Razón |
 |---|---|---|
-| `develop` | snapshots | Features de la próxima versión |
-| `release/**` | snapshots + RC tags | Fixes del release en curso; cada `publish-rc` crea `vX.Y.Z-rc.N` |
-| `hotfix/**` | snapshots + RC tags | Fix urgente; mismo modelo de RCs |
-| `make-release` | **releases** (`vX.Y.Z`) | Versión final e irreversible |
-
-> **Deploy a ambientes**: en v2 actual, los workflows publican el JAR a Nexus pero **no deployan**. La asociación rama→ambiente (testing/staging/production) y el push a infraestructura se hará vía workflow GA-native cuando esté implementado (ver `docs/v2-sin-jenkins-roadmap.md`, Hito 3).
+| `v[0-9]*` | delete + force-push | releases finales son inmutables |
+| `v*-rc.*` | delete + force-push | RCs auditados son inmutables |
+| `v*-snapshot.*` | (libre) | cleanup workflow necesita borrarlos |
 
 ## Reglas críticas
 
@@ -68,21 +106,27 @@ hay que ajustar inputs o triggers específicos del proyecto.
 | Archivo | Trigger | Qué hace |
 |---|---|---|
 | `ci.yml` | PR → develop · push release/\*\* · push hotfix/\*\* | lint + build + security |
-| `publish.yml` | push develop · push release/\*\* · push hotfix/\*\* | snapshot Nexus (sin deploy automático — ver `docs/v2-sin-jenkins-roadmap.md`) |
-| `start-release.yml` | manual (workflow_dispatch) | crea `release/vX.Y.Z` desde develop |
-| `make-release.yml` | manual (workflow_dispatch) | tag + Nexus release + GitHub Release + back-merge (sin deploy production — ver `docs/v2-sin-jenkins-roadmap.md`) |
+| `publish.yml` | push develop · push release/\*\* · push hotfix/\*\* | build JAR + GH pre-release con tag `v*-snapshot.NNN` o `v*-rc.NNN` |
+| `start-release.yml` | manual (workflow_dispatch) | crea `release/vX.Y.Z` desde develop (versión leída de `.github/next-bump`) |
+| `make-release.yml` | manual (workflow_dispatch) | tag final `vX.Y.Z` + GH release + back-merge a develop + reset `.github/next-bump` |
 | `start-hotfix.yml` | manual (workflow_dispatch) | crea `hotfix/vX.Y.Z-desc` desde main |
+| `cleanup-snapshots.yml` | cron daily | borra pre-releases `v*-snapshot.*` viejos (conserva últimos 3 por target) |
+| `update-next-bump.yml` | PR closed (merged) en develop | si el PR tiene label `breaking-change`, setea `.github/next-bump` a `major` |
 | `setup-labels.yml` | manual (workflow_dispatch) | crea/sincroniza las labels estándar (tipo + `size/*`) — correr al inicializar el repo |
 
 > Las labels `size/xs..xl` son informativas y las asigna automáticamente `pr-size-label` en cada PR según líneas y archivos modificados. No reemplazan al label de tipo — `label-check` sigue exigiendo exactamente una de `feature` / `fix` / `chore` / `update` / `deploy-action` / `breaking-change`.
 
-## Secrets y variables requeridos
+## Secrets y variables
+
+Para server apps (este proyecto) **no se requieren secrets de Nexus** — los artefactos van a GH Releases. Auth nativa con `${{ secrets.GITHUB_TOKEN }}`, auto-provisto por GitHub.
 
 | Secret / Variable | Nivel | Uso |
 |---|---|---|
-| `NEXUS_USER` / `NEXUS_PASSWORD` / `NEXUS_URL` | repo | Publicar JAR en Nexus |
+| (ninguno explícito) | — | Build + publish a GH Releases solo necesitan el `GITHUB_TOKEN` que GitHub provee automáticamente |
 
-> **Nota**: en v2 los secrets `JENKINS_DEPLOY_*` y `vars.SISTEMA` ya no aplican — el deploy quedó fuera del scope de los reusable workflows (ver `docs/v2-sin-jenkins-roadmap.md`). Volverán cuando el deploy GA-native esté implementado (Hito 3) o serán reemplazados por nuevos secrets según el mecanismo elegido.
+Cuando el deploy GA-native esté listo (Hito 3, ver `docs/v2-hito2-deploy-spec.md`), se agregarán secrets para Portainer / SSH según el mecanismo elegido.
+
+> Los secrets `NEXUS_*`, `JENKINS_DEPLOY_*` y `vars.SISTEMA` que aparecen en proyectos v1 **NO aplican** a server apps en v2. Si están configurados en el repo, se pueden ignorar/eliminar tras la migración.
 
 ## Convención de configuración
 
@@ -163,3 +207,7 @@ La URL local queda activa por defecto; la URL de testing se comenta con `#` para
 - No usar nombres de secrets distintos a los documentados arriba
 - No modificar el branching model — `develop` nunca mergea directo a `main`
 - No commitear en `develop` para resolver un issue de un release en curso
+- **No publicar a Nexus desde este repo** — server apps en v2 publican a GH Releases. Si `build.sbt` tiene `publishTo` apuntando a Nexus, removerlo en la migración.
+- **No declarar `dynverSeparator` ni `dynverSonatypeSnapshots`** en `build.sbt` — son settings para libs (Maven), no para apps. La versión la calcula el workflow y se pasa como tag GH.
+- **No invocar `jenkins-deploy-trigger`** ni usar secrets `JENKINS_DEPLOY_*` — v2 server apps no dependen de Jenkins (ver `BQN-UY/CI-CD/docs/v2-sin-jenkins-roadmap.md`).
+- **No borrar tags `v[0-9]*` ni `v*-rc.*`** — están protegidos por convención (configurar tag protection en GH Settings).
