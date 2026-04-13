@@ -40,18 +40,16 @@ hay que ajustar inputs o triggers específicos del proyecto.
 | `hotfix/vX.Y.Z-desc` | `main` via `start-hotfix` | `make-release` → `main` | Fix urgente a producción |
 | `main` | — | — | Producción |
 
-## Semántica de ambientes
+## Semántica de Nexus por rama
 
-| Rama | Nexus | Ambiente | Propósito |
-|---|---|---|---|
-| `develop` | snapshots | testing | Features de la próxima versión |
-| `release/**` | snapshots | testing | Fixes del release en curso |
-| `hotfix/**` | snapshots | staging | Fix urgente — espejo de producción |
-| `make-release` | **releases** | production | Versión definitiva e irreversible |
+| Rama | Nexus | Propósito |
+|---|---|---|
+| `develop` | snapshots | Features de la próxima versión |
+| `release/**` | snapshots + RC tags | Fixes del release en curso; cada `publish-rc` crea `vX.Y.Z-rc.N` |
+| `hotfix/**` | snapshots + RC tags | Fix urgente; mismo modelo de RCs |
+| `make-release` | **releases** (`vX.Y.Z`) | Versión final e irreversible |
 
-- **testing**: ambiente compartido por `develop` y `release/**`. Nunca mezcla con producción, pero un push a `develop` puede pisar un deploy de `release/**` que esté siendo validado. Congelar merges a `develop` mientras se valida un release.
-- **staging**: espejo de producción, exclusivo para validar hotfixes. Nunca comparte estado con testing.
-- **production**: solo vía `make-release` manual. Crea tag Git, publica en Nexus releases, crea GitHub Release, mergea a main y hace back-merge a develop.
+> **Deploy a ambientes**: en v2 actual, los workflows publican el JAR a Nexus pero **no deployan**. La asociación rama→ambiente (testing/staging/production) y el push a infraestructura se hará vía workflow GA-native cuando esté implementado (ver `docs/v2-sin-jenkins-roadmap.md`, Hito 3).
 
 ## Reglas críticas
 
@@ -70,9 +68,9 @@ hay que ajustar inputs o triggers específicos del proyecto.
 | Archivo | Trigger | Qué hace |
 |---|---|---|
 | `ci.yml` | PR → develop · push release/\*\* · push hotfix/\*\* | lint + build + security |
-| `publish-and-deploy.yml` | push develop · push release/\*\* · push hotfix/\*\* | snapshot Nexus + deploy automático |
+| `publish.yml` | push develop · push release/\*\* · push hotfix/\*\* | snapshot Nexus (sin deploy automático — ver `docs/v2-sin-jenkins-roadmap.md`) |
 | `start-release.yml` | manual (workflow_dispatch) | crea `release/vX.Y.Z` desde develop |
-| `make-release.yml` | manual (workflow_dispatch) | tag + Nexus release + GitHub Release + deploy production + back-merge |
+| `make-release.yml` | manual (workflow_dispatch) | tag + Nexus release + GitHub Release + back-merge (sin deploy production — ver `docs/v2-sin-jenkins-roadmap.md`) |
 | `start-hotfix.yml` | manual (workflow_dispatch) | crea `hotfix/vX.Y.Z-desc` desde main |
 | `setup-labels.yml` | manual (workflow_dispatch) | crea/sincroniza las labels estándar (tipo + `size/*`) — correr al inicializar el repo |
 
@@ -83,11 +81,8 @@ hay que ajustar inputs o triggers específicos del proyecto.
 | Secret / Variable | Nivel | Uso |
 |---|---|---|
 | `NEXUS_USER` / `NEXUS_PASSWORD` / `NEXUS_URL` | repo | Publicar JAR en Nexus |
-| `JENKINS_DEPLOY_URL` | **org** | URL base del webhook GWT (igual para todos los ambientes) |
-| `JENKINS_DEPLOY_TESTING_TOKEN` | **org** | Token GWT — rutea al job `deploy-nexus-testing` |
-| `JENKINS_DEPLOY_STAGING_TOKEN` | **org** | Token GWT — rutea al job `deploy-nexus-staging` |
-| `JENKINS_DEPLOY_PRODUCTION_TOKEN` | **org** | Token GWT — rutea al job `deploy-nexus-production` |
-| `vars.SISTEMA` | repo | Nombre del servicio — se pasa en el payload al webhook |
+
+> **Nota**: en v2 los secrets `JENKINS_DEPLOY_*` y `vars.SISTEMA` ya no aplican — el deploy quedó fuera del scope de los reusable workflows (ver `docs/v2-sin-jenkins-roadmap.md`). Volverán cuando el deploy GA-native esté implementado (Hito 3) o serán reemplazados por nuevos secrets según el mecanismo elegido.
 
 ## Convención de configuración
 

@@ -5,15 +5,8 @@ on:
     branches:
       - "release/**"
       - "hotfix/**"
-    inputs:
-      installation:
-        description: "Instalaciones destino (coma-separado, ej. install-1,install-2). Vacío = todas."
-        required: false
-        default: ""
 
 jobs:
   make-release:
     uses: BQN-UY/CI-CD/.github/workflows/scala-api-make-release.yml@v2
     secrets: inherit
-    with:
-      installation: ${{ inputs.installation }}
