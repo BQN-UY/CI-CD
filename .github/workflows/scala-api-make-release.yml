@@ -4,17 +4,14 @@ name: Scala API · Make Release (reusable)
 #
 #   on:
 #     workflow_dispatch:
-#       inputs:
-#         installation:
-#           description: "Instalaciones destino (coma-separado, ej. install-1,install-2). Vacío = todas."
-#           required: false
-#           default: ""
 #   jobs:
 #     make-release:
 #       uses: BQN-UY/CI-CD/.github/workflows/scala-api-make-release.yml@v2
 #       secrets: inherit
-#       with:
-#         installation: ${{ inputs.installation }}
+#
+# Tag final + Nexus release + GitHub Release + back-merge a develop.
+# NO hace deploy — el deploy es responsabilidad del workflow GA-native
+# cuando esté disponible (ver docs/v2-sin-jenkins-roadmap.md, Hito 3).
 
 on:
   workflow_call:
@@ -24,23 +21,12 @@ on:
         required: false
         type: string
         default: "21"
-      sistema:
-        description: Nombre del servicio (default = vars.SISTEMA o nombre del repo)
-        required: false
-        type: string
-        default: ""
-      installation:
-        description: Instalaciones destino (coma-separado). Vacío = todas.
-        required: false
-        type: string
-        default: ""
 
 jobs:
   release:
-    name: Tag + Nexus + GitHub Release + deploy production + back-merge
+    name: Tag + Nexus + GitHub Release + back-merge
     runs-on: ubuntu-latest
     if: startsWith(github.ref_name, 'release/') || startsWith(github.ref_name, 'hotfix/')
-    environment: production
     permissions:
       contents: write             # requerido para crear tags y hacer push de ramas
       security-events: write      # requerido para subir SARIF al tab de Security
@@ -82,9 +68,7 @@ jobs:
         shell: bash
         run: sbt publish
         env:
-          NEXUS_USER:     ${{ secrets.NEXUS_USER }}
-          NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
-          NEXUS_URL:      ${{ secrets.NEXUS_URL }}
+          NEXUS_URL: ${{ secrets.NEXUS_URL }}
 
       - name: GitHub Release
         uses: BQN-UY/CI-CD/.github/actions/shared/github-release@v2
@@ -104,13 +88,3 @@ jobs:
         with:
           source: main
           target: develop
-
-      - name: Deploy to production
-        uses: BQN-UY/CI-CD/.github/actions/shared/jenkins-deploy-trigger@v2
-        with:
-          environment:  production
-          service-url:  ${{ secrets.JENKINS_DEPLOY_URL }}
-          token:        ${{ secrets.JENKINS_DEPLOY_PRODUCTION_TOKEN }}
-          sistema:      ${{ inputs.sistema != '' && inputs.sistema || (vars.SISTEMA || github.event.repository.name) }}
-          version:      ${{ steps.version.outputs.tag }}
-          installation: ${{ inputs.installation }}

@@ -160,7 +160,7 @@ A partir de v2, además de las composite actions, hay **reusable workflows** que
 | Reusable workflow | Tipo de proyecto | Trigger del caller |
 |---|---|---|
 | `scala-api-ci.yml` | API Scala | `pull_request` + `push` release/hotfix |
-| `scala-api-publish-deploy.yml` | API Scala | `push` develop / release / hotfix |
+| `scala-api-publish.yml` | API Scala | `push` develop / release / hotfix |
 | `scala-api-make-release.yml` | API Scala | `workflow_dispatch` |
 | `scala-api-start-release.yml` | API Scala | `workflow_dispatch` |
 | `scala-api-start-hotfix.yml` | API Scala | `workflow_dispatch` |
