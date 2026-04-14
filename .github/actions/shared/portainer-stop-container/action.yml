@@ -1,0 +1,53 @@
+name: Portainer — stop container
+description: Detiene un container vía Portainer API. Equivalente GA-native de vars/portainer.groovy (stopContainer).
+
+inputs:
+  portainer_url:
+    description: URL base de Portainer (sin trailing slash).
+    required: true
+  portainer_token:
+    description: Token API de Portainer (X-API-KEY).
+    required: true
+  endpoint_id:
+    description: ID del endpoint Portainer (obtenido con portainer-resolve-ids).
+    required: true
+  container_id:
+    description: ID del container Docker dentro del endpoint.
+    required: true
+  insecure_tls:
+    description: Si 'true' usa curl --insecure. Default true.
+    required: false
+    default: "true"
+
+runs:
+  using: composite
+  steps:
+    - name: Stop container
+      shell: bash
+      env:
+        PORTAINER_URL:   ${{ inputs.portainer_url }}
+        PORTAINER_TOKEN: ${{ inputs.portainer_token }}
+        ENDPOINT_ID:     ${{ inputs.endpoint_id }}
+        CONTAINER_ID:    ${{ inputs.container_id }}
+        INSECURE_TLS:    ${{ inputs.insecure_tls }}
+      run: |
+        set -euo pipefail
+
+        CURL_OPTS=(-sS --connect-timeout 10 --max-time 60 -H "X-API-KEY: ${PORTAINER_TOKEN}" -o /dev/null -w "%{http_code}")
+        if [[ "$INSECURE_TLS" == "true" ]]; then
+          CURL_OPTS+=(--insecure)
+        fi
+
+        HTTP_STATUS=$(curl "${CURL_OPTS[@]}" -X POST \
+          "${PORTAINER_URL}/api/endpoints/${ENDPOINT_ID}/docker/containers/${CONTAINER_ID}/stop" || true)
+
+        # Portainer/Docker semantics: 204 = stopped, 304 = already stopped.
+        case "$HTTP_STATUS" in
+          204|304)
+            echo "Container stopped (HTTP $HTTP_STATUS)"
+            ;;
+          *)
+            echo "::error::Failed to stop container — HTTP $HTTP_STATUS" >&2
+            exit 1
+            ;;
+        esac

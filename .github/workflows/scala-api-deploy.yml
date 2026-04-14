@@ -1,0 +1,206 @@
+name: scala-api — deploy (v2) [ESQUELETO / PENDIENTE HITO 3]
+
+# STATUS: esqueleto del reusable workflow de deploy GA-native. Está publicado en
+# la rama de desarrollo pero NO debe ser invocado en producción hasta que:
+#   1. Se confirmen las respuestas de Soporte (docs/v2-hito2bis-validacion-soporte.md).
+#   2. Se instale el runner self-hosted `bqn-deploy` en la LAN.
+#   3. Se implemente el paso "Copy artifact" según el mecanismo acordado (α/β).
+#   4. Se valide end-to-end en acp-api (Hito 3 del roadmap).
+# Ver docs/v2-hito2-deploy-spec.md y docs/v2-sin-jenkins-roadmap.md.
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: Ambiente destino (testing | staging | production)
+        type: string
+        required: true
+      version:
+        description: Tag del GitHub Release del que bajar el artefacto (ej. v1.2.0 o v1.2.0-snapshot.003)
+        type: string
+        required: true
+      installations:
+        description: Instalaciones destino (coma-separado). Vacío = todas las que tengan auto_deploy=true.
+        type: string
+        required: false
+        default: ""
+    secrets:
+      PORTAINER_TOKEN:
+        description: Token API de Portainer (X-API-KEY).
+        required: true
+      CHAT_WEBHOOK_URL:
+        description: Webhook Google Chat del ambiente destino. Opcional en esqueleto.
+        required: false
+
+jobs:
+
+  # ---------------------------------------------------------------------------
+  # Plan: parsea .github/deploy.json, valida ambiente, filtra instalaciones
+  # (auto_deploy o selección explícita) y emite la matriz para el job de deploy.
+  # ---------------------------------------------------------------------------
+  plan:
+    name: Plan (${{ inputs.environment }})
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+      count:  ${{ steps.plan.outputs.count }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate deploy.json and build matrix
+        id: plan
+        env:
+          ENVIRONMENT:   ${{ inputs.environment }}
+          INSTALLATIONS: ${{ inputs.installations }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! -f .github/deploy.json ]]; then
+            echo "::error::.github/deploy.json no existe en el repo — ver docs/deploy-json-schema.md" >&2
+            exit 1
+          fi
+
+          ENV_CONFIG=$(jq --arg e "$ENVIRONMENT" '.environments[$e] // empty' .github/deploy.json)
+          if [[ -z "$ENV_CONFIG" ]]; then
+            echo "::error::deploy.json no define ambiente '$ENVIRONMENT'" >&2
+            exit 1
+          fi
+
+          if [[ -z "$INSTALLATIONS" ]]; then
+            SELECTED=$(echo "$ENV_CONFIG" | jq '[.installations[] | select(.auto_deploy == true)]')
+          else
+            SELECTED=$(echo "$ENV_CONFIG" | jq --arg csv "$INSTALLATIONS" \
+              '($csv | split(",") | map(gsub("^\\s+|\\s+$"; ""))) as $names
+               | [.installations[] | select(.name as $n | $names | index($n))]')
+          fi
+
+          COUNT=$(echo "$SELECTED" | jq 'length')
+          if [[ "$COUNT" == "0" ]]; then
+            echo "::warning::No hay instalaciones para deploy (auto_deploy vacío o selección no coincide)"
+          fi
+
+          MATRIX=$(echo "$SELECTED" | jq -c '{include: .}')
+          echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
+          echo "count=$COUNT"   >> "$GITHUB_OUTPUT"
+
+  # ---------------------------------------------------------------------------
+  # Deploy: corre una matriz paralela, una instancia por instalación.
+  # Gated por GH Environment (required reviewers en production).
+  # Corre en el runner self-hosted `bqn-deploy` (acceso LAN a Portainer y a
+  # los bind-mounts de los containers).
+  # ---------------------------------------------------------------------------
+  deploy:
+    name: Deploy ${{ matrix.name }}
+    needs: plan
+    if: needs.plan.outputs.count != '0'
+    runs-on: [self-hosted, bqn-deploy]  # TBD: label definitivo tras confirmar topología del runner
+    environment: ${{ inputs.environment }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.plan.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve Portainer IDs
+        id: ids
+        uses: BQN-UY/CI-CD/.github/actions/shared/portainer-resolve-ids@v2
+        with:
+          portainer_url:   ${{ vars.PORTAINER_URL }}
+          portainer_token: ${{ secrets.PORTAINER_TOKEN }}
+          endpoint_name:   ${{ matrix.portainer_endpoint }}
+          container_name:  ${{ matrix.portainer_container }}
+
+      - name: Download artifact from GH Release
+        env:
+          GH_TOKEN:  ${{ github.token }}
+          TAG:       ${{ inputs.version }}
+          EXT:       ${{ matrix.artifact.extension }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # El publish workflow adjunta un único .${EXT} al release.
+          gh release download "$TAG" --repo "${GITHUB_REPOSITORY}" --pattern "*.${EXT}" --dir ./_artifact
+          ls -la ./_artifact
+
+      - name: Stop container
+        uses: BQN-UY/CI-CD/.github/actions/shared/portainer-stop-container@v2
+        with:
+          portainer_url:   ${{ vars.PORTAINER_URL }}
+          portainer_token: ${{ secrets.PORTAINER_TOKEN }}
+          endpoint_id:     ${{ steps.ids.outputs.endpoint_id }}
+          container_id:    ${{ steps.ids.outputs.container_id }}
+
+      # -----------------------------------------------------------------------
+      # TBD — Copy artifact al deploy_path del container.
+      #
+      # Mecanismo pendiente de confirmación (ver docs/v2-hito2bis-validacion-soporte.md §1):
+      #   α. cp local si el runner tiene el bind-mount montado (modelo actual Jenkins).
+      #   β. scp al host destino vía SSH (requiere keys del runner a cada host).
+      #   γ. Portainer `/containers/{id}/archive` (upload vía API, sin SSH ni mount).
+      #
+      # Placeholder: se asume α con runner que tiene acceso FS directo a
+      # matrix.artifact.deploy_path. Cambiar tras decisión.
+      # -----------------------------------------------------------------------
+      - name: Copy artifact to deploy path
+        env:
+          SRC_DIR:     ./_artifact
+          EXT:         ${{ matrix.artifact.extension }}
+          DEPLOY_PATH: ${{ matrix.artifact.deploy_path }}
+          TARGET_NAME: ${{ matrix.artifact.target_name || matrix.name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          SRC=$(ls "$SRC_DIR"/*."$EXT" | head -n1)
+          DEST="${DEPLOY_PATH}/${TARGET_NAME}.${EXT}"
+          echo "Copying $SRC -> $DEST"
+          # cp "$SRC" "$DEST"
+          echo "::warning::Paso 'Copy artifact' no implementado — pendiente de confirmación Soporte (α/β/γ)"
+
+      - name: Start container
+        uses: BQN-UY/CI-CD/.github/actions/shared/portainer-start-container@v2
+        with:
+          portainer_url:   ${{ vars.PORTAINER_URL }}
+          portainer_token: ${{ secrets.PORTAINER_TOKEN }}
+          endpoint_id:     ${{ steps.ids.outputs.endpoint_id }}
+          container_id:    ${{ steps.ids.outputs.container_id }}
+
+      - name: Record deployment (GitHub Deployments API)
+        if: always()
+        env:
+          GH_TOKEN:    ${{ github.token }}
+          ENVIRONMENT: ${{ inputs.environment }}
+          REF:         ${{ inputs.version }}
+          INSTALL:     ${{ matrix.name }}
+          STATUS:      ${{ job.status }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # TBD: crear Deployment + DeploymentStatus vía gh api.
+          # Detalle de campos: description, environment, ref, payload.installation.
+          echo "Deployment record (TBD): env=$ENVIRONMENT ref=$REF install=$INSTALL status=$STATUS"
+
+  # ---------------------------------------------------------------------------
+  # Notify: resumen final a Google Chat (1 mensaje por deploy, no por
+  # instalación). Corre siempre (éxito o fallo).
+  # ---------------------------------------------------------------------------
+  notify:
+    name: Notify
+    needs: [plan, deploy]
+    if: always() && needs.plan.outputs.count != '0'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Google Chat message
+        if: ${{ secrets.CHAT_WEBHOOK_URL != '' }}
+        env:
+          WEBHOOK:     ${{ secrets.CHAT_WEBHOOK_URL }}
+          ENVIRONMENT: ${{ inputs.environment }}
+          VERSION:     ${{ inputs.version }}
+          STATUS:      ${{ needs.deploy.result }}
+          ACTOR:       ${{ github.actor }}
+          RUN_URL:     ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          BODY=$(jq -nc --arg t "Deploy *${GITHUB_REPOSITORY}* *${VERSION}* -> *${ENVIRONMENT}* — *${STATUS}* (por ${ACTOR}) <${RUN_URL}|run>" \
+            '{text: $t}')
+          curl -sS -X POST -H "Content-Type: application/json" -d "$BODY" "$WEBHOOK" >/dev/null

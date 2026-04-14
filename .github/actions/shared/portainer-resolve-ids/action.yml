@@ -1,0 +1,82 @@
+name: Portainer — resolve endpoint & container IDs
+description: Resuelve endpoint_id y container_id a partir de sus nombres vía Portainer API. Equivalente GA-native de vars/portainer.groovy (getEndopintId + getContainerIdByName).
+
+inputs:
+  portainer_url:
+    description: URL base de Portainer (sin trailing slash). Ej. https://docker-soporte:9443
+    required: true
+  portainer_token:
+    description: Token API de Portainer (X-API-KEY). Provisto desde secret del caller.
+    required: true
+  endpoint_name:
+    description: Nombre del endpoint Portainer (se busca por PublicURL). Ej. docker-testing
+    required: true
+  container_name:
+    description: Nombre exacto del container dentro del endpoint. Ej. acp-api_testing
+    required: true
+  insecure_tls:
+    description: Si 'true' usa curl --insecure (self-signed cert). Default true por continuidad con v1.
+    required: false
+    default: "true"
+
+outputs:
+  endpoint_id:
+    description: ID numérico del endpoint Portainer
+    value: ${{ steps.resolve.outputs.endpoint_id }}
+  container_id:
+    description: ID del container Docker dentro del endpoint
+    value: ${{ steps.resolve.outputs.container_id }}
+
+runs:
+  using: composite
+  steps:
+    - name: Resolve endpoint and container IDs
+      id: resolve
+      shell: bash
+      env:
+        PORTAINER_URL:   ${{ inputs.portainer_url }}
+        PORTAINER_TOKEN: ${{ inputs.portainer_token }}
+        ENDPOINT_NAME:   ${{ inputs.endpoint_name }}
+        CONTAINER_NAME:  ${{ inputs.container_name }}
+        INSECURE_TLS:    ${{ inputs.insecure_tls }}
+      run: |
+        set -euo pipefail
+
+        if ! command -v jq &>/dev/null; then
+          echo "::error::jq is required but not installed. Add 'sudo apt-get install -y jq' before this action." >&2
+          exit 1
+        fi
+
+        CURL_OPTS=(-sS --connect-timeout 10 --max-time 30 -H "X-API-KEY: ${PORTAINER_TOKEN}" -H "Content-Type: application/json")
+        if [[ "$INSECURE_TLS" == "true" ]]; then
+          CURL_OPTS+=(--insecure)
+        fi
+
+        # 1) Resolve endpoint ID — match by PublicURL (mirrors vars/portainer.groovy behavior)
+        ENDPOINT_JSON=$(curl "${CURL_OPTS[@]}" \
+          "${PORTAINER_URL}/api/endpoints?search=$(jq -rn --arg n "$ENDPOINT_NAME" '$n | @uri')")
+
+        ENDPOINT_ID=$(echo "$ENDPOINT_JSON" | jq --arg name "$ENDPOINT_NAME" '[.[] | select(.PublicURL == $name)][0].Id // empty')
+        if [[ -z "$ENDPOINT_ID" || "$ENDPOINT_ID" == "null" ]]; then
+          echo "::error::Endpoint '$ENDPOINT_NAME' not found in Portainer (searched by PublicURL)" >&2
+          exit 1
+        fi
+        echo "Resolved endpoint '$ENDPOINT_NAME' -> id=$ENDPOINT_ID"
+
+        # 2) Resolve container ID — filter by name on Docker API, then match exact on Names[]
+        FILTER=$(jq -cn --arg n "$CONTAINER_NAME" '{name: [$n]}')
+        FILTER_ENC=$(jq -rn --arg f "$FILTER" '$f | @uri')
+
+        CONTAINERS_JSON=$(curl "${CURL_OPTS[@]}" \
+          "${PORTAINER_URL}/api/endpoints/${ENDPOINT_ID}/docker/containers/json?all=true&filters=${FILTER_ENC}")
+
+        CONTAINER_ID=$(echo "$CONTAINERS_JSON" | jq --arg name "$CONTAINER_NAME" '
+          [.[] | select((.Names // []) | map(sub("^/"; "")) | index($name))][0].Id // empty')
+        if [[ -z "$CONTAINER_ID" || "$CONTAINER_ID" == "null" ]]; then
+          echo "::error::Container '$CONTAINER_NAME' not found in endpoint '$ENDPOINT_NAME'" >&2
+          exit 1
+        fi
+        echo "Resolved container '$CONTAINER_NAME' -> id=${CONTAINER_ID:0:12}"
+
+        echo "endpoint_id=$ENDPOINT_ID"   >> "$GITHUB_OUTPUT"
+        echo "container_id=$CONTAINER_ID" >> "$GITHUB_OUTPUT"

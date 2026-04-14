@@ -1,0 +1,47 @@
+name: Deploy
+
+# Caller del reusable workflow de deploy v2 (GA-native, sin Jenkins).
+# NOTA: el reusable workflow está en esqueleto hasta que se cierre Hito 3
+# (ver docs/v2-sin-jenkins-roadmap.md). Este template se puede copiar ya
+# a los repos, pero no debe invocarse en producción hasta entonces.
+#
+# Requisitos del repo caller:
+#   - Tener `.github/deploy.json` válido (ver docs/deploy-json-schema.md).
+#   - Org secret `PORTAINER_TOKEN` y var `PORTAINER_URL` configurados.
+#   - GH Environments `testing`/`staging`/`production` con required reviewers
+#     en production.
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Ambiente destino
+        type: choice
+        options: [testing, staging, production]
+        required: true
+      version:
+        description: Tag del GH Release a deployar (ej. v1.2.0-snapshot.003, v1.2.0-rc.001, v1.2.0)
+        type: string
+        required: true
+      installations:
+        description: Instalaciones destino (coma-separado). Vacío = todas con auto_deploy=true.
+        type: string
+        required: false
+        default: ""
+
+  # Disparadores automáticos (cuando Hito 3 esté listo, descomentar según política):
+  #
+  # release:
+  #   types: [published]        # auto-deploy a testing en snapshots / staging en rc / production manual
+  #
+
+jobs:
+  deploy:
+    uses: BQN-UY/CI-CD/.github/workflows/scala-api-deploy.yml@v2
+    with:
+      environment:   ${{ inputs.environment }}
+      version:       ${{ inputs.version }}
+      installations: ${{ inputs.installations }}
+    secrets:
+      PORTAINER_TOKEN:   ${{ secrets.PORTAINER_TOKEN }}
+      CHAT_WEBHOOK_URL:  ${{ secrets.CHAT_WEBHOOK_URL }}

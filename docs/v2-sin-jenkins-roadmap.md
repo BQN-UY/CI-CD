@@ -39,6 +39,16 @@ Tres preguntas a resolver antes de escribir código:
 
 Una vez resueltas (1)(2)(3): instalar runner, implementar workflow, validar end-to-end en acp-api. Ahí acp-api pasa a tener flujo completo v2 sin Jenkins.
 
+**Entregables del Hito 3**:
+- Composite(s) `shared/portainer-*` (equivalentes GA-native de `vars/portainer.groovy` de v1)
+- Reusable workflow `scala-api-deploy.yml` + template caller
+- **JSON Schema** compartido para `.github/deploy.json` en CI-CD repo (cada repo lo referencia con `$schema`)
+- **Workflow de inventario agregado** (cron semanal en CI-CD repo): agrega todos los `.github/deploy.json` de la org BQN-UY y publica `docs/inventory.md` (o issue actualizado) con:
+  - **Estado de migración v2 por repo** (✅ completo / 🟡 publish-only / 🔴 v1 legacy / ⚪ N/A), derivado automáticamente de la presencia de `deploy.json` y del tag `@v2` en los workflows — sin registro manual (ver spec §4.11).
+  - **Vista global del inventario de deploys** + validación cruzada (colisiones, referencias rotas).
+  - Mitiga la pérdida de vista única respecto al `sistemas.json` de v1 (ver spec §4.9 y §4.10).
+- Runner self-hosted instalado + documentado
+
 ### Hito 4 — Migrar proyectos v1 → v2 progresivamente (pendiente Hito 3)
 
 Criterio de orden: **bajo riesgo primero** (1 instalación, sin producción). `sga` (16 instalaciones) y `efactura` (10) al final. Por proyecto, el PR de migración replica el que se hizo en acp-api#11:
