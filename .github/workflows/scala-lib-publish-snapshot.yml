@@ -1,0 +1,51 @@
+name: Scala Lib · Publish snapshot (reusable)
+
+# Reusable workflow v2 — invocar desde el repo cliente con:
+#
+#   on:
+#     push:
+#       branches: [develop]
+#   jobs:
+#     publish-snapshot:
+#       uses: BQN-UY/CI-CD/.github/workflows/scala-lib-publish-snapshot.yml@v2
+#       secrets: inherit
+#
+# Publica un snapshot a Nexus (maven-snapshots) con versión Maven-standard
+# `<base>-SNAPSHOT` derivada de sbt-dynver. NO crea tag ni GH Release —
+# el storage canónico de libs es Nexus (ver docs/v2-hito2-deploy-spec.md §1).
+#
+# Requiere en build.sbt:
+#   - dynverSeparator        := "-"
+#   - dynverSonatypeSnapshots := true
+#   - publishTo              := snapshots → Nexus maven-snapshots
+#   - crossPaths             := true   (default; conservar para libs)
+
+on:
+  workflow_call:
+    inputs:
+      java-version:
+        description: Versión de Java para sbt
+        required: false
+        type: string
+        default: "21"
+
+jobs:
+  publish-snapshot:
+    name: sbt publish → Nexus maven-snapshots
+    runs-on: ubuntu-latest
+    env:
+      TZ: America/Montevideo
+      NEXUS_USER:     ${{ secrets.NEXUS_USER }}
+      NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # sbt-dynver necesita historial Git completo
+
+      - uses: BQN-UY/CI-CD/.github/actions/backend/scala/lint-build@v2
+        with:
+          java-version: ${{ inputs.java-version }}
+
+      - name: sbt publish
+        shell: bash
+        run: sbt publish

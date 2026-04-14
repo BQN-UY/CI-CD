@@ -1,0 +1,12 @@
+name: Publish snapshot
+
+on:
+  push:
+    branches: [develop]
+
+jobs:
+  publish-snapshot:
+    uses: BQN-UY/CI-CD/.github/workflows/scala-lib-publish-snapshot.yml@v2
+    secrets: inherit
+    # with:
+    #   java-version: "21"   # default; override solo si el proyecto usa otra versión
