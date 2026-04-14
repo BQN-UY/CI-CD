@@ -3,6 +3,8 @@
 Guía paso a paso para migrar un repositorio Scala/Pekko desde el modelo v1
 (`version.sbt` + sbt-release + Jenkins) al modelo v2 (`sbt-dynver` + Git tags + webhook deploy).
 
+> **Nota de estado (2026-04)**: esta guía describe el modelo v2 **post-Hito 1** (CI sin Jenkins, publish a Nexus) y **post-Hito 2 §7** (server apps publican a GH Releases, no a Nexus). El modelo v2 **completo con deploy GA-native** (Hito 3) incorpora un paso adicional — agregar `.github/deploy.json` — documentado al final en §7. Hasta que Hito 3 cierre, los repos migrados quedan en estado **publish-only** (publican artefactos pero no deployan). Ver `docs/v2-sin-jenkins-roadmap.md`.
+
 ---
 
 ## Contexto
@@ -521,6 +523,71 @@ actualizar esa referencia para que use la convención de sbt-dynver antes de mig
 [ ] Repo agregado en BQN-UY/CI-CD scala-steward/repos.md
 [ ] PR abierto con label feature hacia develop
 [ ] CI pasa en la feature branch
+```
+
+---
+
+## Paso 7 — (Hito 3, pendiente) Adoptar el deploy GA-native
+
+> **Estado**: pendiente de Hito 3 (ver `docs/v2-sin-jenkins-roadmap.md`). Hasta entonces los repos migrados quedan en **publish-only**. Cuando Hito 3 cierre, este paso se vuelve obligatorio para recuperar auto-deploy a testing/staging/production.
+
+El deploy en v2 se desacopla completamente de Jenkins. Reemplazo:
+
+- Step "Deploy to testing/staging/production" del workflow v1 → **`deploy.yml`** (caller del reusable `scala-api-deploy.yml`).
+- `sistemas.json` centralizado en `BQN-UY/jenkins` → **`.github/deploy.json`** versionado en cada repo (ver `docs/deploy-json-schema.md` y spec §4.9).
+- Secrets `JENKINS_DEPLOY_*` → **`PORTAINER_TOKEN`** (org-level) + **`CHAT_WEBHOOK_URL`** (por ambiente, vía GH Environment).
+- Aprobación production en Jenkins `input` → **GH Environment `production` con required reviewers**.
+
+### 7.1 Crear `.github/deploy.json`
+
+Archivo requerido. Schema: [`schemas/deploy.schema.json`](../schemas/deploy.schema.json). Guía completa y mapping desde `sistemas.json` v1: [`docs/deploy-json-schema.md`](./deploy-json-schema.md).
+
+Estructura mínima:
+
+```json
+{
+  "$schema": "https://raw.githubusercontent.com/BQN-UY/CI-CD/v2/schemas/deploy.schema.json",
+  "application_type": "scala-api",
+  "environments": {
+    "testing":    { "installations": [ { "name": "...", "portainer_endpoint": "...", "portainer_container": "...", "auto_deploy": true, "artifact": { "deploy_path": "/opt/webapps", "extension": "jar" } } ] },
+    "staging":    { "installations": [ ... ] },
+    "production": { "installations": [ ... ] }
+  }
+}
+```
+
+**Validación local** (antes de abrir PR):
+
+```bash
+npx ajv-cli validate -s path/al/schema/deploy.schema.json -d .github/deploy.json --spec=draft2020 --strict=false
+```
+
+### 7.2 Agregar `deploy.yml`
+
+Copiar desde `templates/scala-api/deploy.yml`. Es un caller corto del reusable workflow `scala-api-deploy.yml` del repo CI-CD.
+
+### 7.3 Secrets y variables adicionales
+
+| Nuevo | Dónde | Reemplaza a |
+|---|---|---|
+| Secret `PORTAINER_TOKEN` | org-level | `JENKINS_DEPLOY_*_TOKEN` |
+| Var `PORTAINER_URL` | org-level | `JENKINS_DEPLOY_URL` |
+| Secret `CHAT_WEBHOOK_URL` | GH Environment (por ambiente) | `DEPLOY_APP_WEBHOOK*` de Jenkins |
+| GH Environment `production` → required reviewers | Settings → Environments | `input` submitter de Jenkins |
+
+La variable `SISTEMA` **deja de ser necesaria** en v2 deploy (el repo se identifica a sí mismo; el `application_type` reemplaza su rol).
+
+### 7.4 Checklist — ampliación del deploy v2 (post-Hito 3)
+
+```
+[ ] .github/deploy.json creado, validado contra schema
+[ ] .github/deploy.json referencia application_type correcto
+[ ] deploy.yml copiado desde templates/scala-api/deploy.yml
+[ ] Secret PORTAINER_TOKEN y var PORTAINER_URL confirmados org-level
+[ ] GH Environments testing/staging/production creados en el repo
+[ ] required reviewers configurados en Environment production
+[ ] Primer deploy a testing probado end-to-end
+[ ] Secrets JENKINS_DEPLOY_* retirados del repo (ya no se usan)
 ```
 
 ---
