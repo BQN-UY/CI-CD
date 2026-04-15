@@ -1,11 +1,18 @@
 #!/usr/bin/env python3
 """
-Genera docs/inventory.md con:
-  1. Estado de migración v2 por repo (✅/🟡/🔴/⚪)
-  2. Inventario agregado de deploys (desde cada .github/deploy.json)
-  3. Validación cruzada (colisiones, violaciones de schema)
+Genera dos artefactos a partir del scan de repos de la org:
 
-Clasificación (spec §4.11):
+  docs/inventory.md (humano):
+    1. Estado de migración v2 por repo (✅/🟡/🔴/⚪)
+    2. Inventario agregado de deploys (desde cada .github/deploy.json)
+    3. Validación cruzada (colisiones, violaciones de schema)
+    4. Grafo de libs internas (publishers + consumers)
+
+  config/lib-graph.json (máquina, consumido por scala-lib-make-release):
+    { "publishers": { "BQN-UY/fui": {"groupId": "com.bqn", "artifactId": "fui"}, ... },
+      "consumers":  { "BQN-UY/fui": ["BQN-UY/acp-api", ...], ... } }
+
+Clasificación de migración (spec §4.11):
   ✅ v2 completo      — tiene .github/deploy.json  + workflows usan @v2
   🟡 v2 publish-only  — workflows usan @v2  + sin deploy.json
   🔴 v1 legacy        — workflows invocan scala-deploy-* / scala-make-release-* / scala-publish-*
@@ -28,7 +35,24 @@ from pathlib import Path
 
 ORG = os.environ.get("ORG", "BQN-UY")
 OUTPUT = Path(os.environ.get("OUTPUT", "docs/inventory.md"))
+GRAPH_OUTPUT = Path(os.environ.get("GRAPH_OUTPUT", "config/lib-graph.json"))
 SCHEMA_REL_PATH = "schemas/deploy.schema.json"
+
+# Orgs Maven consideradas internas para el grafo de libs.
+# Configurable via env INTERNAL_GROUPS (CSV), default cubre los dos en uso.
+INTERNAL_GROUPS: tuple[str, ...] = tuple(
+    g.strip() for g in os.environ.get("INTERNAL_GROUPS", "com.bqn,com.zistemas").split(",")
+    if g.strip()
+)
+
+# Regex para parsear build.sbt (heurístico, line-based — no parsea sbt completo).
+RE_NAME = re.compile(r'^\s*name\s*:=\s*"([^"]+)"', re.MULTILINE)
+RE_ORG = re.compile(
+    r'^\s*(?:ThisBuild\s*/\s*)?organization\s*:=\s*"([^"]+)"',
+    re.MULTILINE,
+)
+# "groupId" %% "artifactId" % "X.Y.Z"  — captura groupId y artifactId.
+RE_LIBDEP = re.compile(r'"([\w.-]+)"\s*%%\s*"([\w.-]+)"\s*%\s*"[^"]+"')
 
 # Patrones que detectan uso de workflows de este mismo repo (CI-CD).
 RE_V2 = re.compile(r"BQN-UY/CI-CD/\.github/workflows/[a-z0-9_-]+\.yml@v2")
@@ -65,6 +89,9 @@ class RepoState:
     app_type: str | None = None
     deploy_json: dict | None = None
     notes: list[str] = field(default_factory=list)
+    # Grafo de libs internas (poblado al parsear build.sbt; None si no es Scala)
+    publishes: tuple[str, str] | None = None  # (groupId, artifactId) si publica como lib interna
+    depends_on: list[tuple[str, str]] = field(default_factory=list)  # [(groupId, artifactId), ...]
 
 
 def list_repos(org: str) -> list[dict]:
@@ -107,6 +134,32 @@ def list_workflow_files(org: str, repo: str) -> list[str]:
     return [it["name"] for it in items if it.get("name", "").endswith((".yml", ".yaml"))]
 
 
+def parse_sbt(content: str) -> tuple[tuple[str, str] | None, list[tuple[str, str]]]:
+    """Extrae (publishes, depends_on) de un build.sbt.
+
+    publishes: (groupId, artifactId) si declara `name :=` y `organization :=`
+               en una org interna. None si no califica como lib publisher.
+    depends_on: lista de (groupId, artifactId) con orgs internas referenciadas
+                en `libraryDependencies` (deduplicada, sin versión).
+    """
+    name_m = RE_NAME.search(content)
+    org_m = RE_ORG.search(content)
+    publishes: tuple[str, str] | None = None
+    if name_m and org_m and org_m.group(1) in INTERNAL_GROUPS:
+        publishes = (org_m.group(1), name_m.group(1))
+
+    deps: set[tuple[str, str]] = set()
+    for m in RE_LIBDEP.finditer(content):
+        gid, aid = m.group(1), m.group(2)
+        if gid in INTERNAL_GROUPS:
+            deps.add((gid, aid))
+    # Una lib no se considera consumer de sí misma.
+    if publishes:
+        deps.discard(publishes)
+
+    return publishes, sorted(deps)
+
+
 def classify(org: str, repo: str) -> RepoState:
     state = RepoState(name=repo, archived=False)
 
@@ -142,7 +195,36 @@ def classify(org: str, repo: str) -> RepoState:
     else:
         state.state = "na"
 
+    # Grafo de libs: parsear build.sbt si existe.
+    sbt = get_file(org, repo, "build.sbt")
+    if sbt:
+        state.publishes, state.depends_on = parse_sbt(sbt)
+
     return state
+
+
+def build_lib_graph(states: list[RepoState], org: str) -> dict:
+    """Construye el grafo publishers/consumers a partir de los RepoState parseados."""
+    publishers: dict[str, dict[str, str]] = {}
+    coord_to_repo: dict[tuple[str, str], str] = {}
+    for s in states:
+        if s.publishes:
+            full = f"{org}/{s.name}"
+            gid, aid = s.publishes
+            publishers[full] = {"groupId": gid, "artifactId": aid}
+            coord_to_repo[s.publishes] = full
+
+    consumers: dict[str, list[str]] = {full: [] for full in publishers}
+    for s in states:
+        consumer_full = f"{org}/{s.name}"
+        for coord in s.depends_on:
+            lib_full = coord_to_repo.get(coord)
+            if lib_full and consumer_full not in consumers[lib_full]:
+                consumers[lib_full].append(consumer_full)
+    for k in consumers:
+        consumers[k].sort()
+
+    return {"publishers": publishers, "consumers": consumers}
 
 
 STATE_ICON = {
@@ -153,7 +235,7 @@ STATE_ICON = {
 }
 
 
-def render(states: list[RepoState]) -> str:
+def render(states: list[RepoState], lib_graph: dict) -> str:
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     lines: list[str] = []
     lines.append("# Inventario v2 (generado automáticamente)")
@@ -237,6 +319,31 @@ def render(states: list[RepoState]) -> str:
         lines.append("_Sin incidencias detectadas._")
     lines.append("")
 
+    # Sección 4: grafo de libs internas
+    lines.append("## 4. Grafo de libs internas")
+    lines.append("")
+    lines.append(
+        f"Orgs Maven consideradas internas: {', '.join(f'`{g}`' for g in INTERNAL_GROUPS)}. "
+        "Fuente: parsing line-based de cada `build.sbt` (no soporta `val FuiVersion = \"...\"` ni multi-módulo)."
+    )
+    lines.append("")
+    publishers = lib_graph["publishers"]
+    consumers = lib_graph["consumers"]
+    if not publishers:
+        lines.append("_(ningún repo identificado como publisher de lib interna)_")
+    else:
+        lines.append("| Lib | groupId:artifactId | # consumers | Consumers |")
+        lines.append("|---|---|---|---|")
+        for lib_full in sorted(publishers):
+            meta = publishers[lib_full]
+            cs = consumers.get(lib_full, [])
+            cs_links = ", ".join(f"[{c.split('/', 1)[-1]}](https://github.com/{c})" for c in cs) or "_—_"
+            lines.append(
+                f"| [{lib_full.split('/', 1)[-1]}](https://github.com/{lib_full}) | "
+                f"`{meta['groupId']}:{meta['artifactId']}` | {len(cs)} | {cs_links} |"
+            )
+    lines.append("")
+
     return "\n".join(lines) + "\n"
 
 
@@ -255,10 +362,21 @@ def main() -> int:
             print(f"  error: {e}", file=sys.stderr)
             states.append(RepoState(name=r["name"], archived=False, state="na", notes=[f"error: {e}"]))
 
-    content = render(states)
+    lib_graph = build_lib_graph(states, ORG)
+    content = render(states, lib_graph)
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT.write_text(content, encoding="utf-8")
     print(f"Wrote {OUTPUT} ({len(states)} repos)", file=sys.stderr)
+
+    GRAPH_OUTPUT.parent.mkdir(parents=True, exist_ok=True)
+    GRAPH_OUTPUT.write_text(
+        json.dumps(lib_graph, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    print(
+        f"Wrote {GRAPH_OUTPUT} ({len(lib_graph['publishers'])} publishers)",
+        file=sys.stderr,
+    )
     return 0
 
 
