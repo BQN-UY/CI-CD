@@ -1,0 +1,14 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [develop, "release/**", "hotfix/**"]
+  push:
+    branches: ["release/**", "hotfix/**"]
+
+jobs:
+  ci:
+    uses: BQN-UY/CI-CD/.github/workflows/scala-lib-ci.yml@v2
+    secrets: inherit
+    # with:
+    #   java-version: "21"   # default; override solo si el proyecto usa otra versión

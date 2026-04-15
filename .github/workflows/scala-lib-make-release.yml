@@ -1,0 +1,121 @@
+name: Scala Lib · Make release (reusable)
+
+# Reusable workflow v2 — invocar desde el repo cliente con:
+#
+#   on:
+#     workflow_dispatch:
+#       inputs:
+#         version:
+#           description: "Versión final X.Y.Z (sin prefijo v)"
+#           required: true
+#           type: string
+#   jobs:
+#     make-release:
+#       uses: BQN-UY/CI-CD/.github/workflows/scala-lib-make-release.yml@v2
+#       with:
+#         version: ${{ inputs.version }}
+#       secrets: inherit
+#
+# Tag final `vX.Y.Z` sobre la rama desde la cual se dispara el workflow
+# (típicamente `develop`) → sbt publish a Nexus maven-releases con versión
+# `X.Y.Z` (sin -SNAPSHOT, derivada de sbt-dynver al detectar tag clean).
+# Crea GH Release para trazabilidad. NO usa branches release/hotfix —
+# las libs no requieren stabilización en ambiente.
+#
+# Requiere en build.sbt:
+#   - publishTo := releases → Nexus maven-releases  (cuando NO es snapshot)
+#   - dynverSeparator        := "-"
+#   - dynverSonatypeSnapshots := true
+#   - crossPaths             := true   (default; conservar para libs)
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: "Versión final X.Y.Z (sin prefijo v)"
+        required: true
+        type: string
+      java-version:
+        description: Versión de Java para sbt
+        required: false
+        type: string
+        default: "21"
+
+jobs:
+  make-release:
+    name: Tag + sbt publish → Nexus maven-releases
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write             # crear tag y GH Release
+    env:
+      TZ: America/Montevideo
+      NEXUS_USER:     ${{ secrets.NEXUS_USER }}
+      NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # sbt-dynver necesita historial Git completo
+
+      - name: Validar formato de versión
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Error: version debe tener formato X.Y.Z (recibido: '$VERSION')" >&2
+            exit 1
+          fi
+
+      - name: Validar que el tag no exista y sea estrictamente mayor
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          git fetch --tags --prune
+
+          if git rev-parse --verify "refs/tags/v$VERSION" >/dev/null 2>&1; then
+            echo "Error: el tag v$VERSION ya existe" >&2
+            exit 1
+          fi
+
+          LAST=$(git tag --list 'v[0-9]*' --sort=-version:refname \
+                  | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1 || true)
+          if [ -n "$LAST" ]; then
+            HIGHEST=$(printf '%s\n' "${LAST#v}" "$VERSION" | sort -V | tail -1)
+            if [ "$HIGHEST" != "$VERSION" ] || [ "${LAST#v}" = "$VERSION" ]; then
+              echo "Error: v$VERSION no es mayor que el último tag final ($LAST)" >&2
+              exit 1
+            fi
+          fi
+
+      - name: Crear y pushear tag
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "v$VERSION" -m "Release v$VERSION"
+          git push origin "v$VERSION"
+
+      - uses: BQN-UY/CI-CD/.github/actions/backend/scala/lint-build@v2
+        with:
+          java-version: ${{ inputs.java-version }}
+
+      - name: sbt publish
+        shell: bash
+        run: sbt publish
+
+      - name: Crear GH Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          gh release create "v$VERSION" \
+            --generate-notes \
+            --title "v$VERSION"
