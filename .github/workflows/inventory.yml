@@ -1,0 +1,46 @@
+name: Inventory — estado migración v2 + deploys agregados
+
+# Genera docs/inventory.md con estado de migración, inventario de deploys y
+# validación cruzada. Ver spec §4.10 y §4.11, y scripts/build-inventory.py.
+#
+# Requisitos:
+#   - Secret ORG_INVENTORY_TOKEN: PAT con permisos read sobre repos de la org
+#     BQN-UY (el GITHUB_TOKEN nativo solo ve este repo).
+
+on:
+  schedule:
+    - cron: "17 6 * * 1"    # Lunes 06:17 UTC (≈ 03:17 UYT) — ventana baja
+  workflow_dispatch: {}
+
+permissions:
+  contents: write            # para pushear docs/inventory.md al branch
+
+concurrency:
+  group: inventory
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build inventory
+        env:
+          GH_TOKEN: ${{ secrets.ORG_INVENTORY_TOKEN }}
+          ORG:      BQN-UY
+          OUTPUT:   docs/inventory.md
+        run: python3 scripts/build-inventory.py
+
+      - name: Commit if changed
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- docs/inventory.md; then
+            echo "Sin cambios en inventario."
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/inventory.md
+          git commit -m "chore(inventory): regenerar docs/inventory.md [skip ci]"
+          git push
