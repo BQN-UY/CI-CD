@@ -1,0 +1,22 @@
+name: Make release
+
+# Disparar manualmente desde la rama `develop` (selector "Use workflow from"
+# en la UI de Actions). El tag vX.Y.Z se aplica sobre el HEAD de la rama
+# seleccionada — usar siempre develop salvo casos excepcionales.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Versión final X.Y.Z (sin prefijo v)"
+        required: true
+        type: string
+
+jobs:
+  make-release:
+    uses: BQN-UY/CI-CD/.github/workflows/scala-lib-make-release.yml@v2
+    with:
+      version: ${{ inputs.version }}
+    secrets: inherit
+    # with:
+    #   java-version: "21"   # default; override solo si el proyecto usa otra versión
