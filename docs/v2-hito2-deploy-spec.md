@@ -1,8 +1,10 @@
 # Hito 2 — Spec del deploy GA-native
 
-> Estado: **borrador en discusión** · Tracking: `docs/v2-sin-jenkins-roadmap.md` Hito 2
+> **Estado:** decisiones de diseño cerradas internamente (D1–D7); dos consultas abiertas con Soporte Operativo (C1, C2). Ver §4 y §5. · Tracking: `docs/v2-sin-jenkins-roadmap.md` Hito 2.
 
 Documento canónico del diseño del deploy GA-native que reemplaza a Jenkins en v2. Captura: principios, modelo de artefactos, convención de versionado, requisitos heredados de v1, decisiones tomadas y decisiones abiertas.
+
+> **Documento complementario:** [`docs/v2-deploy-design-proposal-soporte.md`](./v2-deploy-design-proposal-soporte.md) contiene el razonamiento completo de cada decisión, el análisis de opciones descartadas, el mapeo a controles ISO 27001 y la matriz para visto/firma de Soporte. Este spec captura el **qué** final; el proposal captura el **por qué** y es el doc de revisión con Bruno/Jonathan/Elías.
 
 ## Principio rector
 
@@ -193,6 +195,8 @@ Resumen de `deploy-nexus.groovy` del repo `BQN-UY/jenkins`:
 
 ## 4. Decisiones tomadas
 
+Decisiones base del modelo de artefactos y versionado (heredadas de Hito 2 original):
+
 ### 4.1 Modelo de artefactos
 ✅ Server apps usan **GitHub Releases** (no Nexus).  
 ✅ Libs siguen en **Nexus** con formato Maven-standard `<base>-SNAPSHOT`.
@@ -206,63 +210,116 @@ Resumen de `deploy-nexus.groovy` del repo `BQN-UY/jenkins`:
 ✅ Cleanup: últimos **3** snapshots por target (workflow daily).  
 ✅ Tag protection: `v[0-9]*` y `v*-rc.*` protegidos; `v*-snapshot.*` libres.
 
-### 4.4 Modelo de "instalaciones" para deploy
-✅ **B + C combinados**:
-- `.github/deploy.json` (o `.yml`) en cada repo: lista de instalaciones por environment (`portainer_endpoint`, `portainer_container`, `deploy_path`, `target_name`, `auto_deploy`). Versionado con el código.
-- GH Environments por env (testing/staging/production): secrets/tokens/URLs sensibles, required reviewers para production.
+### 4.4 Notificaciones
+✅ Google Chat con dos canales ya existentes: **Deploy - Testing/Staging** y **Deploy - Production**. Workflow elige el canal según `environment`.
 
-### 4.5 Aprobación production
-✅ GH Environments `required reviewers`.  
-🟡 Pendiente confirmar lista de submitters (mantener `admins,soporte,auxiliar_soporte` o ajustar).
-
-### 4.6 Notificaciones
-✅ Mantener Google Chat (continuidad con Soporte).
-
-### 4.7 Registro de deploys
+### 4.5 Registro de deploys
 ✅ **GitHub Deployments API** (nativo). Cada deploy crea un Deployment con env, ref, status. Sin servicio nuevo.
 
-### 4.8 Restore DB
+### 4.6 Restore DB
 ✅ Fuera de scope Hito 2 — se aborda en hito propio (operativos en GA, alineado con informe Jenkins §10 Fase 3).
 
 ---
 
-## 5. Decisiones abiertas (input de Soporte/IDS)
+Decisiones de diseño del deploy GA-native (razonamiento extendido en [`v2-deploy-design-proposal-soporte.md`](./v2-deploy-design-proposal-soporte.md)):
 
-### 5.1 Self-hosted runner GA — ¿dónde y cuántos?
+### D1 · Restart siempre forzado
+✅ Todo deploy termina con `POST /containers/{id}/restart` incondicional tras escribir el artifact. Sin flag ni opt-out. Si eventualmente aparece un caso que requiere zero-downtime, se trata como feature nueva (rolling + múltiples réplicas), no como flag.
 
-| Opción | Pros | Contras |
-|---|---|---|
-| **A. Un runner único** (en `DEPLOY_IP` u otro host) | Mínimo a operar | SPOF; el `cp` al host destino debe ser remoto (SSH) |
-| **B. Un runner por endpoint Portainer** | `cp` local; paraleliza naturalmente | N runners a mantener; más superficie |
-| **C. Runners labeled** (subset, p.ej. uno por DC) | Equilibrio paralelismo/superficie | Diseñar labeling y routing |
+### D2 · Modelo de credenciales — org-level + Keeper + Portainer Team scoping
 
-> **Pregunta**: ¿cuántos `portainer_endpoint` distintos hay hoy y cómo están distribuidos geográficamente?
+3 org secrets con allowlist de repos + source of truth en Keeper Security + scoping real vía Portainer Teams:
 
-### 5.2 Mecanismo de deploy — ¿cómo llegamos al artefacto en el container?
+- `PORTAINER_TOKEN_DEPLOY` — Keeper folder prod-critical/testing-staging, allowlist de repos con environment declarados.
+- `GCHAT_WEBHOOK_TESTING_STAGING` — idem.
+- `GCHAT_WEBHOOK_PRODUCTION` — Keeper folder prod-critical, allowlist restringido a repos con `environment: production`.
 
-| Opción | Cómo funciona | Encaja si |
-|---|---|---|
-| **α. Portainer API** | stop → recreate via API (artefacto vía volumen Docker o rebuild de imagen) | Containers totalmente gestionados por Portainer |
-| **β. SSH + Docker** | runner SSH al host, `docker stop && cp && docker start` | Hosts tienen Docker + SSH abierto |
-| **γ. SCP + systemd** | runner SCP el JAR, `systemctl restart` | Services como units systemd, sin containers |
+Control SoD 3-way emergente (Keeper/GH/Portainer) formalizado como estructura ISO existente, no como diseño ad-hoc.
 
-> **Pregunta**: ¿services todos containerizados? ¿JAR/WAR en volumen o dentro de la imagen?
+### D3 · Allowlist de repos prod por criterio objetivo
+Un repo entra al allowlist de los 3 org secrets si y solo si declara al menos una instalación con `environment: production` en `.github/deploy.json`. Mantenimiento manual por Pablo/Bruno (ISO A.8.2). Criterio auditable automáticamente.
 
-### 5.3 Schema de `.github/deploy.json`
+### D4 · Pilotos secuenciales antes de rollout masivo
+1. **Piloto 1:** `acp-api` (scala-api/pekko).
+2. **Piloto 2:** `colectivizacion` (tomcat/.war).
 
-Borrador (sujeto a refinar tras 5.1 y 5.2):
+Criterios de éxito comunes para promover a rollout:
+- ≥3 deploys consecutivos exitosos en testing.
+- ≥1 deploy exitoso en staging.
+- ≥1 rollback practicado (redeploy tag anterior).
+- Soporte confirma operabilidad autónoma (un analista ejecuta end-to-end sin dev).
 
-```json
-{
-  "environments": {
-    "testing":    { "installations": [ { "name": "...", "portainer_endpoint": "...", "portainer_container": "...", "deploy_path": "/opt/webapps", "target_name": "...", "auto_deploy": true } ] },
-    "staging":    { "installations": [ ... ] },
-    "production": { "installations": [ ... ] }
-  }
-}
+### D5 · Approvers de producción + fusible SoD
+
+GH Environments:
+
+```yaml
+production:
+  required_reviewers: [Pablo Zebraitis, Bruno Artola, Jonathan Correa Paiva, Elías Severino]
+  prevent_self_review: OFF        # ver fusible
+  required_approvals: 1
+  deployment_branches: protected tags v[0-9]*
+staging:
+  required_reviewers: []          # auto-deploy
+  deployment_branches: release/**, hotfix/**
+testing:
+  required_reviewers: []          # auto-deploy si auto_deploy: true
+  deployment_branches: develop
 ```
 
-> **Pregunta**: ¿campos extra que faltan respecto a `sistemas.json` v1? ¿Algún proyecto tiene casos edge no cubiertos?
+**Fusible self-approval** (alternative control ISO A.8.3): step del workflow detecta si aprobador = originador del trigger. Si coinciden → alerta al canal Deploy-Production + justificación obligatoria (`workflow_dispatch input`) + registro en job output. No bloquea el deploy. Revisión trimestral por ISO Officer.
+
+**Equipo IDS Development (Santi, Nacho, Jose) no entra al pool.** Regla explícita, no accidente. Su participación en el proceso termina en merge a `main` / push a `develop`; el CI reacciona automáticamente.
+
+### D6 · Paths intra-container en `deploy.json`
+`executable_path` es el path **dentro del container**, no en el host. El workflow escribe vía `PUT /containers/{id}/archive` a través del proxy Docker API de Portainer (sujeto a confirmación C1 — Opción C del runner).
+
+Esto desacopla totalmente al CI/CD del layout del host. Cambiar un bind mount en compose no rompe el deploy. El dev escribe el path "que la app ve", no el path físico.
+
+### D7 · Auto-deploy opt-in per-instalación
+Cada instalación en `deploy.json` declara `auto_deploy: true` o lo omite. Default `false` (solo deploy manual). Preserva la semántica actual de `sistemas.json` v1 (casos como `sga_testing_crl`, `sga_testing_lpi` siguen requiriendo manual).
+
+Cuando se publica un snapshot/RC y la instalación tiene `auto_deploy: false`, el workflow notifica al canal correspondiente con **⏸️ Deploy manual pendiente** + link directo al `workflow_dispatch` con tag pre-rellenado. Capability nueva de v2 (no existe en v1).
+
+---
+
+## 5. Decisiones abiertas (consultas activas con Soporte)
+
+Dos consultas ya formuladas al canal de Soporte. Las respuestas condicionan parte del diseño.
+
+### C1 · Arquitectura del runner — viabilidad de Opción C
+
+Tres opciones evaluadas:
+
+| Opción | Modelo | Resultado |
+|---|---|---|
+| A | 1 runner único + SSH/SCP a hosts | Descartada en propuesta (credenciales SSH nuevas, SPOF). Fallback si C no viable. |
+| B | 1 runner por host | Descartada en propuesta (provisioning × N, superficie de credenciales distribuida). |
+| **C** | 1 runner único + Docker API vía Portainer (escritura con `PUT /containers/{id}/archive`) | **Propuesta**. Runner 100% network-only en `docker-soporte`; reusa el token Portainer; sin credenciales SSH nuevas; sin provisioning por host. |
+
+**Pregunta en curso:** para todos los server-apps actuales, ¿el `executable_path` está bind-mounted dentro del container? Si sí → C viable. Si hay casos de paths no bind-mounted (ej `/opt/webapps` centralizado) → A para esos casos puntuales.
+
+### C2 · Identificación de containers en `deploy.json`
+
+Propuesta: identificar por `stack + service + replicas[]` (labels de compose: `com.docker.compose.project`/`.service`), no por nombre de container (que en la mayoría de casos es autogenerado `<stack>-<servicio>-<replica>`).
+
+Schema propuesto:
+
+```yaml
+installations:
+  - id: acp-testing
+    environment: testing
+    portainer_endpoint: docker-soporte
+    stack: acp_services
+    service: acp-api
+    replicas: [1, 2]            # opcional; omitido = todas
+    executable_path: /app/lib/acp-api.jar
+    auto_deploy: true
+```
+
+**Preguntas en curso:**
+1. ¿`tcp_server` es hoy el único stack con réplicas múltiples? ¿Se esperan más en corto/mediano plazo?
+2. ¿Hay containers sin stack de compose (standalone, creados manual) que requerirían identificación por nombre explícito?
 
 ---
 
@@ -270,15 +327,21 @@ Borrador (sujeto a refinar tras 5.1 y 5.2):
 
 El spec se considera completo cuando responde:
 
-- [ ] (5.1) Runner GA: cantidad, ubicación, plan de instalación
-- [ ] (5.2) Mecanismo de deploy elegido (α/β/γ) con ejemplo end-to-end
-- [ ] (5.3) Schema final de `.github/deploy.json`
-- [x] (4.x) Resto de decisiones tomadas
-- [ ] Lista de secrets/vars nuevos requeridos por el runner (Portainer token, SSH keys, etc.)
-- [ ] Diseño del composite `shared/deploy-*` y workflow `scala-api-deploy.yml`
-- [ ] Criterio de migración: cómo un repo v2 publish-only adopta el deploy GA-native (PR mecánico)
+- [x] (4.1–4.6) Modelo de artefactos, versionado, cleanup, tag protection, notificaciones, registro
+- [x] (D1) Restart siempre forzado
+- [x] (D2) Modelo de credenciales (org-level + Keeper + Portainer Team)
+- [x] (D3) Allowlist de repos prod por criterio objetivo
+- [x] (D4) Pilotos definidos con criterios de éxito
+- [x] (D5) Approvers prod + fusible SoD
+- [x] (D6) Paths intra-container
+- [x] (D7) Auto-deploy opt-in per-instalación
+- [ ] (C1) Arquitectura del runner — viabilidad de Opción C (consulta abierta con Soporte)
+- [ ] (C2) Identificación de containers — réplicas y casos standalone (consulta abierta con Soporte)
+- [ ] Conformidad firmada de Soporte Operativo sobre `v2-deploy-design-proposal-soporte.md`
+- [ ] Diseño del composite `shared/deploy-*` y workflow `scala-api-deploy.yml` (Hito 3)
+- [ ] Criterio de migración: cómo un repo v2 publish-only adopta el deploy GA-native (PR mecánico, Hito 3)
 
-Cuando el spec esté completo → arranca Hito 3 (implementación).
+Cuando C1 + C2 + conformidad de Soporte estén resueltas → arranca Hito 3 (implementación).
 
 ---
 
@@ -339,9 +402,10 @@ flowchart LR
 
 ## 9. Próximos pasos
 
-1. Compartir este spec con Soporte/IDS para responder §5.1, §5.2, §5.3.
-2. Cuando estén las respuestas → consolidar en este mismo PR.
-3. Mergear → habilita la ejecución de §7 y luego Hito 3.
+1. Compartir [`v2-deploy-design-proposal-soporte.md`](./v2-deploy-design-proposal-soporte.md) con Bruno, Jonathan y Elías vía Drive para obtener visto/firma sobre D1–D7 + respuestas a C1/C2.
+2. Cuando lleguen las respuestas de C1 (runner/Opción C) y C2 (identificación de containers) → consolidar en §5 de este spec y en el proposal.
+3. Firmado el proposal → arranca Hito 3 (implementación de composites + reusable workflows).
+4. Durante Hito 3, Jenkins v1 permanece operativo como fallback hasta completar los dos pilotos + rollout por olas.
 
 ---
 
@@ -352,6 +416,7 @@ Documentos por jerarquía de autoridad:
 | Doc | Audiencia | Qué busca |
 |---|---|---|
 | **Este spec (`docs/v2-hito2-deploy-spec.md`)** | AIs + humanos | Modelo canónico de versionado y deploy v2 server apps. Si hay conflicto entre docs, **este gana**. |
+| `docs/v2-deploy-design-proposal-soporte.md` | Humanos (Soporte + Dev) | Razonamiento extendido de cada decisión D1–D7, análisis de opciones descartadas, mapeo ISO 27001, matriz de conformidad. Doc de revisión con Soporte Operativo. |
 | `CLAUDE.md` (root) | AI Claude | Reglas operativas del repo: dónde modificar, dónde no, ambientes válidos. |
 | `templates/scala-api/CLAUDE.md` | AI Claude (proyectos) | Reglas para apps Scala individuales: branching, secrets, convenciones. |
 | `.github/copilot-instructions.md` (root y template) | AI Copilot | Versión condensada de las reglas. |
