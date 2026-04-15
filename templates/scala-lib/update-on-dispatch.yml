@@ -1,0 +1,21 @@
+name: Update on dispatch
+
+# Receptor del evento `lib-released` — abre PR a develop bumpeando la dep
+# en build.sbt cuando una lib interna publica una release final.
+#
+# Requiere secret `DISPATCH_TOKEN` (PAT org-wide con scope `repo`).
+
+on:
+  repository_dispatch:
+    types: [lib-released]
+
+jobs:
+  bump:
+    uses: BQN-UY/CI-CD/.github/workflows/scala-bump-internal-lib.yml@v2
+    with:
+      group-id:    ${{ github.event.client_payload.group-id }}
+      artifact-id: ${{ github.event.client_payload.artifact-id }}
+      version:     ${{ github.event.client_payload.version }}
+      lib-repo:    ${{ github.event.client_payload.repo }}
+    secrets:
+      dispatch-token: ${{ secrets.DISPATCH_TOKEN }}
