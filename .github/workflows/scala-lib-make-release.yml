@@ -22,6 +22,11 @@ name: Scala Lib · Make release (reusable)
 # Crea GH Release para trazabilidad. NO usa branches release/hotfix —
 # las libs no requieren stabilización en ambiente.
 #
+# Si el secret `DISPATCH_TOKEN` está configurado, propaga la release a los
+# consumers vía `repository_dispatch types: [lib-released]` (Fase 3 de C).
+# El mapa de consumers vive en BQN-UY/CI-CD/config/lib-graph.json (generado
+# por el workflow `inventory.yml` en este repo).
+#
 # Requiere en build.sbt:
 #   - publishTo := releases → Nexus maven-releases  (cuando NO es snapshot)
 #   - dynverSeparator        := "-"
@@ -119,3 +124,64 @@ jobs:
           gh release create "v$VERSION" \
             --generate-notes \
             --title "v$VERSION"
+
+      - name: Notificar consumers (repository_dispatch)
+        # Propagación event-driven (Fase 3 de C): lee config/lib-graph.json del
+        # repo CI-CD, busca consumers de este repo y dispara `lib-released`.
+        # Skip silencioso si DISPATCH_TOKEN no está configurado o si el repo
+        # aún no figura como publisher en el grafo.
+        # No falla la release si la propagación parcial falla — la release ya
+        # está publicada en Nexus + GH; los consumers se pueden bumpear a mano.
+        continue-on-error: true
+        shell: bash
+        env:
+          DISPATCH_TOKEN: ${{ secrets.DISPATCH_TOKEN }}
+          REPO:           ${{ github.repository }}
+          VERSION:        ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${DISPATCH_TOKEN:-}" ]; then
+            echo "DISPATCH_TOKEN no configurado. Skip propagación a consumers."
+            exit 0
+          fi
+          export GH_TOKEN="$DISPATCH_TOKEN"
+
+          GRAPH_JSON=$(gh api repos/BQN-UY/CI-CD/contents/config/lib-graph.json \
+                        --jq '.content' 2>/dev/null | base64 -d || true)
+          if [ -z "$GRAPH_JSON" ]; then
+            echo "::warning::config/lib-graph.json no existe en BQN-UY/CI-CD aún (inventory.yml todavía no corrió)."
+            exit 0
+          fi
+
+          PUBLISHER=$(echo "$GRAPH_JSON" | jq -r --arg r "$REPO" '.publishers[$r] // empty')
+          if [ -z "$PUBLISHER" ]; then
+            echo "::warning::Repo $REPO no figura como publisher en lib-graph.json. Regenerar inventario para incluirlo."
+            exit 0
+          fi
+
+          GROUP_ID=$(echo    "$PUBLISHER"   | jq -r '.groupId')
+          ARTIFACT_ID=$(echo "$PUBLISHER"   | jq -r '.artifactId')
+          mapfile -t CONSUMERS < <(echo "$GRAPH_JSON" | jq -r --arg r "$REPO" '.consumers[$r][]?')
+
+          if [ "${#CONSUMERS[@]}" -eq 0 ]; then
+            echo "Sin consumers registrados para $REPO. Nada que propagar."
+            exit 0
+          fi
+
+          echo "Propagando v$VERSION ($GROUP_ID:$ARTIFACT_ID) a ${#CONSUMERS[@]} consumer(s):"
+          OK=0
+          for CONSUMER in "${CONSUMERS[@]}"; do
+            echo "  → $CONSUMER"
+            if gh api -X POST "repos/$CONSUMER/dispatches" \
+                  -f event_type=lib-released \
+                  -f "client_payload[group-id]=$GROUP_ID" \
+                  -f "client_payload[artifact-id]=$ARTIFACT_ID" \
+                  -f "client_payload[version]=$VERSION" \
+                  -f "client_payload[repo]=$REPO"; then
+              OK=$((OK+1))
+            else
+              echo "::warning::Falló dispatch a $CONSUMER (¿sin caller update-on-dispatch.yml o sin permisos?)"
+            fi
+          done
+          echo "Propagación completa: $OK/${#CONSUMERS[@]} OK."
