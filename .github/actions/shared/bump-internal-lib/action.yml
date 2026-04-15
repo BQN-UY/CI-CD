@@ -1,0 +1,138 @@
+name: Bump internal lib
+description: |
+  Actualiza la versión de una librería interna en todos los `*.sbt` del repo
+  y abre un PR contra la rama target. Idempotente: si la rama ya existe upstream
+  o si no hay coincidencias, sale sin error.
+
+  Limitación conocida: solo soporta declaraciones inline del tipo
+  `"groupId" %% "artifactId" % "X.Y.Z"`. NO soporta versiones declaradas como
+  `val FuiVersion = "..."`.
+
+inputs:
+  group-id:
+    description: Maven groupId (ej. com.bqn, com.zistemas)
+    required: true
+  artifact-id:
+    description: Maven artifactId (ej. fui, db)
+    required: true
+  version:
+    description: Nueva versión (X.Y.Z, sin prefijo v)
+    required: true
+  lib-repo:
+    description: Repo GitHub de la lib (org/name) — para descripción del PR
+    required: false
+    default: ""
+  target-branch:
+    description: Rama base contra la cual abrir el PR
+    required: false
+    default: develop
+  github-token:
+    description: Token con scope `repo` para pushear rama y abrir PR (PAT, no GITHUB_TOKEN)
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: ${{ inputs.target-branch }}
+        token: ${{ inputs.github-token }}
+        fetch-depth: 0
+
+    - name: Bump version en *.sbt
+      id: bump
+      shell: bash
+      env:
+        GROUP_ID:    ${{ inputs.group-id }}
+        ARTIFACT_ID: ${{ inputs.artifact-id }}
+        NEW_VERSION: ${{ inputs.version }}
+      run: |
+        set -euo pipefail
+        python3 - <<'PY'
+        import os, re, glob, sys
+
+        gid = os.environ['GROUP_ID']
+        aid = os.environ['ARTIFACT_ID']
+        new = os.environ['NEW_VERSION']
+
+        # Match: "groupId" %% "artifactId" % "version"
+        # Captura el prefijo completo (incluye espaciado original) y la versión vieja.
+        pattern = re.compile(
+            r'("' + re.escape(gid) + r'"\s*%%\s*"' + re.escape(aid) + r'"\s*%\s*)"([^"]+)"'
+        )
+
+        files = sorted(set(glob.glob('**/*.sbt', recursive=True)))
+        old_versions = set()
+        changed_files = []
+        already_at_new = False
+
+        for f in files:
+            with open(f) as fh:
+                src = fh.read()
+            def repl(m):
+                old_versions.add(m.group(2))
+                return f'{m.group(1)}"{new}"'
+            new_src, n = pattern.subn(repl, src)
+            if n > 0 and new_src != src:
+                with open(f, 'w') as fh:
+                    fh.write(new_src)
+                changed_files.append((f, n))
+
+        out = open(os.environ['GITHUB_OUTPUT'], 'a')
+        if not changed_files:
+            if old_versions == {new}:
+                print(f'{gid}:{aid} ya está en {new} — nada que hacer', file=sys.stderr)
+            else:
+                print(f'No se encontraron declaraciones de {gid}:{aid} en *.sbt', file=sys.stderr)
+            out.write('changed=false\n')
+            sys.exit(0)
+
+        for f, n in changed_files:
+            print(f'  {f}: {n} ocurrencia(s) actualizada(s)', file=sys.stderr)
+        out.write('changed=true\n')
+        out.write(f'old_versions={",".join(sorted(old_versions))}\n')
+        PY
+
+    - name: Crear branch + PR
+      if: steps.bump.outputs.changed == 'true'
+      shell: bash
+      env:
+        GH_TOKEN:      ${{ inputs.github-token }}
+        GROUP_ID:      ${{ inputs.group-id }}
+        ARTIFACT_ID:   ${{ inputs.artifact-id }}
+        NEW_VERSION:   ${{ inputs.version }}
+        LIB_REPO:      ${{ inputs.lib-repo }}
+        TARGET_BRANCH: ${{ inputs.target-branch }}
+        OLD_VERSIONS:  ${{ steps.bump.outputs.old_versions }}
+      run: |
+        set -euo pipefail
+        BRANCH="update/${ARTIFACT_ID}-${NEW_VERSION}"
+
+        # Idempotencia: si la rama ya existe upstream, asumimos PR ya abierto.
+        if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
+          echo "Branch $BRANCH ya existe upstream — PR ya creado, salgo." >&2
+          exit 0
+        fi
+
+        git config user.name  "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git checkout -b "$BRANCH"
+        git add -A
+        git commit -m "update: bump ${GROUP_ID}:${ARTIFACT_ID} a ${NEW_VERSION}"
+        git push -u origin "$BRANCH"
+
+        REPO_LINE=""
+        if [ -n "$LIB_REPO" ]; then
+          REPO_LINE=$'\n\n'"Origen: https://github.com/${LIB_REPO}/releases/tag/v${NEW_VERSION}"
+        fi
+
+        BODY="Auto-generado por workflow \`scala-bump-internal-lib\` (CI/CD v2).
+
+        Bumpea \`${GROUP_ID}:${ARTIFACT_ID}\` de \`${OLD_VERSIONS}\` a \`${NEW_VERSION}\`.${REPO_LINE}"
+
+        gh pr create \
+          --base "$TARGET_BRANCH" \
+          --head "$BRANCH" \
+          --title "update: bump ${ARTIFACT_ID} a ${NEW_VERSION}" \
+          --body  "$BODY" \
+          --label update

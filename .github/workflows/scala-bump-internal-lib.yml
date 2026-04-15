@@ -1,0 +1,71 @@
+name: Scala · Bump internal lib (reusable)
+
+# Reusable workflow v2 — receptor del evento `lib-released` emitido por
+# `scala-lib-make-release.yml` cuando se publica una release final de una lib
+# interna. Abre PR en el repo consumer bumpeando la dep en `build.sbt`.
+#
+# Invocar desde el caller del consumer:
+#
+#   on:
+#     repository_dispatch:
+#       types: [lib-released]
+#   jobs:
+#     bump:
+#       uses: BQN-UY/CI-CD/.github/workflows/scala-bump-internal-lib.yml@v2
+#       with:
+#         group-id:    ${{ github.event.client_payload.group-id }}
+#         artifact-id: ${{ github.event.client_payload.artifact-id }}
+#         version:     ${{ github.event.client_payload.version }}
+#         lib-repo:    ${{ github.event.client_payload.repo }}
+#       secrets:
+#         dispatch-token: ${{ secrets.DISPATCH_TOKEN }}
+#
+# `DISPATCH_TOKEN` es un PAT org-wide con scope `repo` — necesario porque
+# el GITHUB_TOKEN auto-provisto NO puede disparar workflows en el PR creado.
+
+on:
+  workflow_call:
+    inputs:
+      group-id:
+        description: Maven groupId de la lib publicada (ej. com.bqn)
+        required: true
+        type: string
+      artifact-id:
+        description: Maven artifactId de la lib publicada (ej. fui)
+        required: true
+        type: string
+      version:
+        description: Versión final publicada (X.Y.Z, sin prefijo v)
+        required: true
+        type: string
+      lib-repo:
+        description: Repo GitHub de la lib publicada (org/name) — para link en el PR
+        required: false
+        type: string
+        default: ""
+      target-branch:
+        description: Rama del consumer contra la que abrir el PR
+        required: false
+        type: string
+        default: develop
+    secrets:
+      dispatch-token:
+        description: PAT con scope `repo` para pushear rama y abrir PR
+        required: true
+
+jobs:
+  bump:
+    name: Bump ${{ inputs.artifact-id }} → ${{ inputs.version }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: BQN-UY/CI-CD/.github/actions/shared/bump-internal-lib@v2
+        with:
+          group-id:      ${{ inputs.group-id }}
+          artifact-id:   ${{ inputs.artifact-id }}
+          version:       ${{ inputs.version }}
+          lib-repo:      ${{ inputs.lib-repo }}
+          target-branch: ${{ inputs.target-branch }}
+          github-token:  ${{ secrets.dispatch-token }}
