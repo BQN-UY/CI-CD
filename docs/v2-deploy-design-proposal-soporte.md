@@ -1,9 +1,9 @@
 # Propuesta de diseño Deploy v2 — Documento de evaluación con Soporte Operativo
 
-> **Estado:** Borrador para revisión conjunta Desarrollo ↔ Soporte Operativo.
+> **Estado:** Alineado tras revisión conjunta Desarrollo ↔ Soporte Operativo + follow-up Pablo ↔ Bruno. El cierre del issue [#98](https://github.com/BQN-UY/CI-CD/issues/98) por parte de Bruno opera como evidencia de acuerdo — no se requiere firma formal separada.
 > **Autores:** Pablo Zebraitis (Technical Lead / ISO Officer).
 > **Destinatarios:** Bruno Artola (Head of Operational Support), Jonathan Correa Paiva (Analista Operativo), Elías Severino (Analista Operativo).
-> **Fecha:** 2026-04-15.
+> **Fecha:** 2026-04-15. **Última revisión:** 2026-04-16 (tras cierre de D2 y D3 en reunión Pablo ↔ Bruno — acta en [`docs/v2-deploy-followup-bruno.md`](./v2-deploy-followup-bruno.md)).
 > **Objetivo del documento:** Alcanzar alineamiento explícito sobre el diseño de la migración de deploy v1 (Jenkins) → v2 (GitHub Actions) **antes** de iniciar la implementación de Hito 3.
 
 ---
@@ -82,7 +82,7 @@ Todas las decisiones son **revisables**. Si Soporte identifica una razón operat
 | Fuente de artefactos | NAS/FTP (descarga vía `remoteTarget`) | GitHub Releases (descarga vía `gh release download`) | Inmutabilidad, auditoría nativa, eliminar dependencia NAS |
 | Copia del artifact | `cp` a `/opt/webapps/...` o `home container` del host | `PUT /containers/{id}/archive` vía Docker API (Portainer proxy) | Desacopla el CI/CD del layout del host |
 | Restart del container | Jenkins → script → `docker restart` | Portainer API `POST /containers/{id}/restart` | Unificado, auditable, vía Teams de Portainer |
-| Credenciales | FTP + SSH + token Portainer (per-app, user `github` FreeIPA) | Org-level secrets GH + mismo token Portainer + Keeper como source of truth | Menos secrets a rotar, SoD natural Keeper/GH/Portainer |
+| Credenciales | FTP + SSH + token Portainer (per-app, user `github` FreeIPA) | Org-level secrets GH (primario) + Keeper (backup valor + ledger) + Portainer Team scoping | Menos secrets a rotar, SoD natural GH/Keeper/Portainer |
 | Aprobación producción | Job Jenkins `DeployApp` (admins, soporte, auxiliar_soporte) | GH Environment `production` con required reviewers | Nativo de la plataforma, auditable por GitHub |
 | Notificaciones Chat | Webhooks por app, desde Jenkins | Webhooks unificados por ambiente, desde el workflow | Deploy-Testing/Staging y Deploy-Production siguen siendo 2 canales |
 | Rollback | Redeploy de versión anterior vía Jenkins | Redeploy de tag anterior vía `workflow_dispatch` | Mismo concepto, ejecutado por GH en vez de Jenkins |
@@ -142,25 +142,47 @@ Si eventualmente apareciera un caso que requiere zero-downtime, la solución cor
 
 ---
 
-### 5.2 Modelo de credenciales (org-level secrets + Keeper + Portainer Team scoping)
+### 5.2 Modelo de credenciales (GH primario + Keeper backup + Portainer Team scoping)
 
-**Propuesta.** Un único juego de credenciales org-level con allowlist de repos, source of truth en Keeper Security, y scoping de privilegio real del lado de Portainer (Teams).
+**Propuesta final** (tras follow-up 2026-04-16). GitHub org secrets actúan como sistema **primario** de almacenamiento runtime de los 3 secrets. Keeper Security actúa como **backup explícito** del valor + ledger de rotación, ownership y fechas (disaster recovery). Portainer mantiene el scoping real de privilegio vía Teams. Portainer y Google Chat son las fuentes regenerables de último recurso.
+
+**Regla operativa de rotación.** En cada rotación (anual o por incidente), se escribe primero al GH org secret y a continuación al folder Keeper correspondiente, en la misma sesión operativa. Un único patrón para los 3 secrets.
+
+**Propietarios operativos.**
+
+- **Pablo + Bruno:** responsables de la creación, rotación y carga de los 3 secrets en GH y Keeper.
+- **Jonathan:** backup contingente de Bruno. Si Bruno no está disponible para una rotación programada o de incidente, Pablo + Jonathan operan el par (requiere elevación temporal de Jonathan a admin GH org mientras dure la contingencia, revertida al regreso de Bruno).
 
 ```text
-Keeper Security (source of truth)                Quién accede
-├── folder "prod-critical"                        Pablo + Bruno
-│   └── Portainer token prod, webhook prod
-└── folder "testing-staging"                      Pablo + Bruno + Jonathan
-    └── Portainer token, webhooks
-
-GitHub org secrets (copia para deployment-time)   Quién provisiona
+GitHub org secrets (PRIMARIO — runtime)           Quién provisiona
 ├── PORTAINER_TOKEN_DEPLOY                        Pablo + Bruno
 ├── GCHAT_WEBHOOK_TESTING_STAGING                 Pablo + Bruno
 └── GCHAT_WEBHOOK_PRODUCTION                      Pablo + Bruno
 
-Portainer (privilege enforcement)                 Quién configura Teams
+Keeper Security (BACKUP valor + ledger)           Quién accede
+├── folder "prod-critical"                        Pablo + Bruno
+│   ├── PORTAINER_TOKEN_DEPLOY   (valor + metadata)
+│   └── GCHAT_WEBHOOK_PRODUCTION (valor + metadata)
+└── folder "testing-staging"                      Pablo + Bruno + Jonathan
+    └── GCHAT_WEBHOOK_TESTING_STAGING (valor + metadata)
+
+Portainer (privilege enforcement + regeneración)  Quién configura Teams
 └── Team "deploy-apps" → endpoints/containers     Soporte Operativo
+
+Google Chat (regeneración de webhooks)            Quién administra
+└── Webhooks incoming por canal                   Workspace admin
 ```
+
+Cada entrada en Keeper almacena: valor actual + fecha de creación + fecha de próxima rotación + owner + mapping a GH secret + endpoint Portainer o canal Chat de origen.
+
+**Fortalezas del modelo β (GH primario + Keeper backup).**
+
+- GitHub es el lugar donde el equipo ya opera; cargar el secret donde se consume elimina context-switching.
+- El carácter write-only de GH actúa como control natural: el valor activo es inviolable salvo sobrescritura intencional.
+- Keeper tiene un rol único y claro (backup + ledger); no compite con GH como "lugar de consulta".
+- Audit trail doble e independiente: GH org audit log registra la escritura; Keeper registra acceso al backup.
+- Portainer y Google Chat siguen siendo fuentes regenerables — camino existente, sin complejidad añadida.
+- ISO A.5.17 cumplido con 3 capas visibles al auditor: sistema primario (GH) + backup (Keeper) + fuente regenerable (Portainer/Google Chat).
 
 **Análisis.**
 
@@ -189,9 +211,9 @@ Control SoD emergente (3-way):
 
 | Actor | Puede | No puede |
 |---|---|---|
-| Pablo / Bruno | Ver en Keeper, escribir a GH secrets | Crear tokens en Portainer (Soporte) |
-| Jonathan | Ver testing/staging en Keeper | Escribir GH secrets (no es admin org) |
-| Soporte | Crear/revocar tokens Portainer, configurar Teams | Ver los secrets finales en GH |
+| Pablo / Bruno | Escribir GH secrets + escribir backup en Keeper | Crear tokens en Portainer |
+| Jonathan (backup de Bruno) | Rutinario: leer backup Keeper testing-staging. Contingencia: operar como Bruno con elevación temporal a admin GH org | Rutinariamente, escribir GH secrets |
+| Soporte | Crear/revocar tokens Portainer, configurar Teams | Ver el valor del secret en GH ni en Keeper |
 
 Esta estructura **no fue diseñada ad-hoc para v2** — emerge de herramientas ya instaladas (Keeper, GH roles, Portainer). Vale formalizarla como control ISO existente.
 
@@ -199,21 +221,21 @@ Mapeo ISO:
 
 | Control | Cómo se cumple |
 |---|---|
-| A.5.15 Access control / need-to-know | Allowlist de repos + Portainer Team scoping + folders Keeper |
-| A.5.17 Authentication info | Keeper como gestión centralizada; rotación anual viable |
+| A.5.15 Access control / need-to-know | Allowlist de repos + Portainer Team scoping + folders Keeper segregados |
+| A.5.17 Authentication info | Sistema primario GH + backup Keeper + regenerable Portainer/Google Chat; rotación anual viable con 3 secrets |
 | A.8.2 Privileged access | Portainer Team define qué endpoints/containers puede tocar el token |
-| A.8.3 SoD | 3-way Keeper/GH/Portainer, sin diseño extra |
-| A.8.15 Logging | Keeper logs + GH Actions logs + Portainer logs = triple trail |
+| A.8.3 SoD | 3-way GH/Keeper/Portainer; Jonathan como backup contingente de Bruno documentado |
+| A.8.15 Logging | Keeper logs + GH Actions audit log + Portainer logs = triple trail independiente |
 
 **Implicancias para Soporte.**
 
 - Soporte configura un único `Team "deploy-apps"` en Portainer que define los endpoints/containers que el pipeline puede tocar.
-- El token vive en Keeper (folder según nivel). Soporte lo regenera allí cuando toca rotarlo; Pablo/Bruno lo propagan a GH secrets.
+- Soporte regenera tokens en Portainer cuando toca rotarlos; Pablo/Bruno los cargan en GH y respaldan en Keeper en la misma sesión.
 - Onboarding de un repo nuevo: agregar repo al allowlist de los 3 org secrets (1 minuto, GH UI). No se crean tokens ni webhooks nuevos.
 
-**Pedido a Soporte.**
+**Cierre de D2.**
 
-> ¿Hay algún requisito operativo o normativo (DNLQ, DGI, otra auditoría externa) que obligue a mantener un token Portainer distinto por aplicación? El modelo v2 propuesto consolida en un token único con scoping vía Teams; si existe un requisito que lo invalide, volvemos al modelo per-app y dimensionamos el costo de rotación.
+Soporte marcó §5.2 como ⚠️ "conforme con observaciones" en la revisión del 2026-04-15. En reunión 1:1 Pablo ↔ Bruno del 2026-04-16 se acordó el modelo β descrito arriba — GH primario + Keeper backup — con Pablo + Bruno como responsables operativos y Jonathan como backup contingente de Bruno. Acta: [`docs/v2-deploy-followup-bruno.md`](./v2-deploy-followup-bruno.md). D2 pasa a ✅ `conforme`.
 
 ---
 
@@ -262,6 +284,16 @@ Caso "testing sí, prod nunca":
 > (Pregunta 1) ¿Existe hoy algún server app que esté en testing/staging pero que **nunca** vaya a ir a producción (herramienta interna, banco de pruebas, etc.)? Si sí, listar — va en allowlist de testing/staging pero NO en el de prod.
 >
 > (Pregunta 2) ¿Algún repo "en transición" (aún no prod pero lo será pronto) que convenga tratar distinto mientras tanto?
+
+**Hallazgo posterior — "Producción interna" (deferido).**
+
+En la revisión del 2026-04-15, Soporte identificó una categoría no contemplada por el diseño: herramientas internas del equipo de Soporte Operativo que no viven en `testing/staging` sino en "servidor de soporte o dev" y podrían considerarse "Producción interna". En reunión 1:1 Pablo ↔ Bruno del 2026-04-16 se acordó:
+
+- **Fuera de alcance de v2.** Estas herramientas no entran en el rollout de Hito 3/4. Siguen operándose como hoy (Jenkins/manual según corresponda).
+- **Dirección tentativa para cuando se retome:** modelar un 4to environment `environment: soporte` en `deploy.json`, reflejando que son herramientas internas del equipo de Soporte Operativo. Allowlist, approvers y canal Chat propios, independientes de `production`. Detalle de diseño queda abierto — se aborda en una etapa posterior con inventario concreto.
+- **Acción abierta:** armar inventario (Pablo + Bruno, sin fecha comprometida) de qué herramientas entran en esta categoría antes de diseñar el environment.
+
+Acta completa: [`docs/v2-deploy-followup-bruno.md`](./v2-deploy-followup-bruno.md).
 
 ---
 
@@ -565,7 +597,7 @@ Tabla consolidada del mapeo de decisiones a controles ISO. Sirve como base para 
 | Control | Requisito | Aplicación en v2 |
 |---|---|---|
 | A.5.15 Access control | Principio de need-to-know | Allowlist de repos + Portainer Team scoping + folders Keeper segregados por nivel |
-| A.5.17 Authentication information | Credenciales gestionadas | Keeper como source of truth; 3 secrets a rotar anualmente (viable con equipo de 7) |
+| A.5.17 Authentication information | Credenciales gestionadas | Sistema primario GH + backup Keeper + regenerable Portainer/Google Chat; 3 secrets a rotar anualmente (viable con equipo de 7) |
 | A.5.30 ICT continuity | Capacidad de recuperación | Rollback documentado (redeploy tag anterior); v1 Jenkins sigue como fallback durante transición |
 | A.8.2 Privileged access rights | Gestionados formalmente | Allowlist controlado por Pablo/Bruno; Portainer Teams definidos por Soporte; Keeper roles |
 | A.8.3 SoD | Separación de deberes (o alternative controls) | 3-way Keeper/GH/Portainer; equipo IDS fuera del deploy; fusible + revisión trimestral como alternative control |
@@ -653,32 +685,34 @@ Durante todas las fases, **Jenkins v1 sigue disponible como fallback** (decisió
 
 ## 9. Matriz de decisiones — tabla de revisión
 
-Para facilitar la revisión. Soporte puede marcar cada fila con ✅ (conforme), ⚠️ (conforme con observaciones), o ❌ (no conforme + comentario).
+Estado tras revisión 2026-04-15 (PDF Soporte) + follow-up 2026-04-16 (reunión Pablo ↔ Bruno). ✅ (conforme), ⚠️ (conforme con observaciones), ❌ (no conforme).
 
 | # | Decisión | Resumen | Sección | Conformidad |
 |---|---|---|---|---|
-| D1 | Restart siempre forzado | Incondicional tras escribir el artifact; sin flag | 5.1 | ⬜ |
-| D2 | Modelo de credenciales Model C refinado | 3 org secrets + Keeper + Portainer Team scoping | 5.2 | ⬜ |
-| D3 | Allowlist de repos prod por `environment: production` en `deploy.json` | Criterio objetivo, auditable | 5.3 | ⬜ |
-| D4 | Pilotos `acp-api` + `colectivizacion` | Secuenciales, con criterios de éxito explícitos | 5.4 | ⬜ |
-| D5 | Approvers prod + fusible SoD | 4 personas, self-approve permitido con alerta+justificación | 5.5 | ⬜ |
-| D6 | Paths intra-container en `deploy.json` | Desacopla del layout del host | 5.6 | ⬜ |
-| D7 | Auto-deploy opt-in per-instalación | Default `false`, notificación "⏸️ pendiente" automática | 5.7 | ⬜ |
-| C1 | Arquitectura del runner (A/B/C) | Propuesta: C si bind mounts lo permiten | 6.1 | ⬜ respuesta a pregunta |
-| C2 | Identificación de containers | Por stack+service+replicas (no por nombre) | 6.2 | ⬜ respuesta a preguntas |
+| D1 | Restart siempre forzado | Incondicional tras escribir el artifact; sin flag | 5.1 | ✅ |
+| D2 | Modelo de credenciales β (GH primario + Keeper backup) | 3 org secrets + Keeper backup + Portainer Team scoping. Pablo + Bruno responsables; Jonathan backup de Bruno | 5.2 | ✅ (cerrado en follow-up 2026-04-16; era ⚠️) |
+| D3 | Allowlist de repos prod por `environment: production` en `deploy.json` | Criterio objetivo, auditable. Hallazgo "Producción interna" deferido a etapa posterior (ver §5.3) | 5.3 | ✅ con observación (hallazgo nuevo deferido) |
+| D4 | Pilotos `acp-api` + `colectivizacion` | Secuenciales, con criterios de éxito explícitos | 5.4 | ✅ |
+| D5 | Approvers prod + fusible SoD | 4 personas, self-approve permitido con alerta+justificación | 5.5 | ✅ |
+| D6 | Paths intra-container en `deploy.json` | Desacopla del layout del host | 5.6 | ✅ |
+| D7 | Auto-deploy opt-in per-instalación | Default `false`, notificación "⏸️ pendiente" automática | 5.7 | ✅ |
+| C1 | Arquitectura del runner (A/B/C) | Opción C viable (todos bind-mounted, confirmado por Soporte) | 6.1 | ✅ |
+| C2 | Identificación de containers | Por stack+service+replicas (no por nombre) | 6.2 | ✅ |
+
+Acta del follow-up que cerró D2 y D3: [`docs/v2-deploy-followup-bruno.md`](./v2-deploy-followup-bruno.md).
 
 ---
 
-## 10. Conformidades
+## 10. Evidencia de acuerdo
 
-Firma/visto de las partes indica alineamiento con las decisiones del documento. Reservas u observaciones específicas se indican por fila en la matriz anterior.
+Se prescinde de firma formal separada. La evidencia de acuerdo entre las partes queda registrada mediante:
 
-| Rol | Nombre | Fecha | Conformidad |
-|---|---|---|---|
-| Head of Operational Support | Bruno Artola | | |
-| Analista Operativo | Jonathan Correa Paiva | | |
-| Analista Operativo | Elías Severino | | |
-| Technical Lead / ISO Officer | Pablo Zebraitis | | |
+- **Issue [#98 "Review diseño deploy v2"](https://github.com/BQN-UY/CI-CD/issues/98):** al cerrarse con estado `closed` por Bruno Artola (Head of Operational Support), queda registrado como acuerdo sobre las decisiones D1–D7 + C1, C2 según conformidades de §9.
+- **Revisión 2026-04-15 (PDF de Soporte):** documento entregado por Soporte Operativo con conformidades explícitas fila por fila. Archivo original en Drive (ver Anexo B).
+- **Follow-up 2026-04-16 (Pablo ↔ Bruno):** acta en [`docs/v2-deploy-followup-bruno.md`](./v2-deploy-followup-bruno.md) donde se cierran D2 y D3.
+- **Historia git de este documento:** trazabilidad de cada modificación con autor y fecha.
+
+El cruce de estos 4 elementos constituye el registro de acuerdo para SGSI / ISO 27001 (control A.5.17 change management, A.8.32).
 
 ---
 
