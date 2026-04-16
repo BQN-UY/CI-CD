@@ -226,15 +226,17 @@ Decisiones de diseño del deploy GA-native (razonamiento extendido en [`v2-deplo
 ### D1 · Restart siempre forzado
 ✅ Todo deploy termina con `POST /containers/{id}/restart` incondicional tras escribir el artifact. Sin flag ni opt-out. Si eventualmente aparece un caso que requiere zero-downtime, se trata como feature nueva (rolling + múltiples réplicas), no como flag.
 
-### D2 · Modelo de credenciales — org-level + Keeper + Portainer Team scoping
+### D2 · Modelo de credenciales — β (GH primario + Keeper backup + Portainer Team scoping)
 
-3 org secrets con allowlist de repos + source of truth en Keeper Security + scoping real vía Portainer Teams:
+3 org secrets: GH como sistema primario de runtime, Keeper como backup explícito del valor + ledger, Portainer Teams como scoping real de privilegio. Regla operativa: escribir GH → respaldar Keeper en la misma sesión.
 
-- `PORTAINER_TOKEN_DEPLOY` — Keeper folder prod-critical/testing-staging, allowlist de repos con environment declarados.
-- `GCHAT_WEBHOOK_TESTING_STAGING` — idem.
-- `GCHAT_WEBHOOK_PRODUCTION` — Keeper folder prod-critical, allowlist restringido a repos con `environment: production`.
+- `PORTAINER_TOKEN_DEPLOY` — backup en Keeper folder `prod-critical`, allowlist restringido a repos que declaran `environment: production`.
+- `GCHAT_WEBHOOK_PRODUCTION` — backup en Keeper folder `prod-critical`, allowlist idem.
+- `GCHAT_WEBHOOK_TESTING_STAGING` — backup en Keeper folder `testing-staging`, allowlist idem.
 
-Control SoD 3-way emergente (Keeper/GH/Portainer) formalizado como estructura ISO existente, no como diseño ad-hoc.
+Control SoD 3-way (GH/Keeper/Portainer) + Jonathan como backup contingente de Bruno. Formalizado como estructura ISO existente, no como diseño ad-hoc. Cerrado en follow-up 2026-04-16 (ver acta [`v2-deploy-followup-bruno.md`](./v2-deploy-followup-bruno.md)).
+
+**Runbook operativo por secret** (crear/cargar/rotar): [`v2-secrets-runbook.md`](./v2-secrets-runbook.md).
 
 ### D3 · Allowlist de repos prod por criterio objetivo
 Un repo entra al allowlist de los 3 org secrets si y solo si declara al menos una instalación con `environment: production` en `.github/deploy.json`. Mantenimiento manual por Pablo/Bruno (ISO A.8.2). Criterio auditable automáticamente.
