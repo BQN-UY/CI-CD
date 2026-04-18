@@ -38,7 +38,7 @@ jobs:
       contents: read
       pull-requests: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: BQN-UY/CI-CD/.github/actions/shared/label-check@v2
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -62,7 +62,7 @@ jobs:
       NEXUS_USER: ${{ secrets.NEXUS_USER }}
       NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0          # sbt-dynver necesita historial Git completo
       - uses: BQN-UY/CI-CD/.github/actions/backend/scala/lint-build@v2
@@ -76,7 +76,7 @@ jobs:
       contents: read
       security-events: write    # requerido para subir SARIF al tab de Security
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0          # detect-secrets analiza historial completo
       - uses: BQN-UY/CI-CD/.github/actions/shared/security-scan@v2

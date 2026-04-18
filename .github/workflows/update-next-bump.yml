@@ -41,7 +41,7 @@ jobs:
             echo "PR sin label 'breaking-change' — nada que hacer"
           fi
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         if: steps.check.outputs.is_breaking == 'true'
         with:
           ref: develop
