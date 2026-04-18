@@ -7,7 +7,7 @@ Contiene composite actions reutilizables (v2), reusable workflows v2 y los reusa
 
 ## Contexto organizacional (unidad Banquinet)
 
-Equipo, roles, restricciones estructurales, herramientas, stakeholders y política IA de la unidad Banquinet: [`BQN-UY/banquinet/README.md@7ed73a7`](https://github.com/BQN-UY/banquinet/blob/7ed73a725db88473de9d32d87007b6dbc0db3ea1/README.md) (permalink al commit fijo). Útil para razonar sobre alcance, estimación y quién decide/aprueba. **Actualizar el sha del permalink cuando cambie el README canónico** del repo `BQN-UY/banquinet`.
+Equipo, roles, restricciones estructurales, herramientas, stakeholders y política IA de la unidad Banquinet: [`BQN-UY/banquinet/README.md@8fb0749`](https://github.com/BQN-UY/banquinet/blob/8fb07499762e059a3ca49cf960f9bd1f66cda5e4/README.md) (permalink al commit fijo). Útil para razonar sobre alcance, estimación y quién decide/aprueba. **Actualizar el sha del permalink cuando cambie el README canónico** del repo `BQN-UY/banquinet`.
 
 **Tracking cross-repo de esta iniciativa**: issue canónico [`BQN-UY/banquinet#3 — Tracking — CI/CD v2`](https://github.com/BQN-UY/banquinet/issues/3). Fuente única de verdad del estado global de la migración v2. Este repo mantiene spec + código; el estado organizacional de la iniciativa vive allí. Convención de uso: [`BQN-UY/banquinet/docs/TRACKING.md`](https://github.com/BQN-UY/banquinet/blob/main/docs/TRACKING.md).
 
