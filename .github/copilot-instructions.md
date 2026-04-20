@@ -2,6 +2,8 @@
 
 > **Doc canónico**: `docs/v2-hito2-deploy-spec.md`. Si hay conflicto, ese gana.
 
+> **Tracking cross-repo**: `BQN-UY/banquinet#3` es fuente única del estado global de la migración v2. Al cerrar PR/issue que avanza hito, cierra blocker, o formaliza política v2: postear update comment al issue (formato `## Update YYYY-MM-DD — <agente/sesión>` con Hito/Próximo/Bloqueos/Links). Convención en `banquinet/docs/TRACKING.md`. NO aplica para typos, renames internos, ni dependabot bumps sin cambio de API.
+
 ## Qué es este repo
 
 Repositorio centralizado de CI/CD. Composite actions v2 viven en `.github/actions/`. Reusable workflows v2 (con prefijo `<stack>-`) viven en `.github/workflows/`. Workflows sin prefijo en `.github/workflows/` son **v1 legacy** — no modificar.

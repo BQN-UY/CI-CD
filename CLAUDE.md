@@ -11,6 +11,31 @@ Equipo, roles, restricciones estructurales, herramientas, stakeholders y políti
 
 **Tracking cross-repo de esta iniciativa**: issue canónico [`BQN-UY/banquinet#3 — Tracking — CI/CD v2`](https://github.com/BQN-UY/banquinet/issues/3). Fuente única de verdad del estado global de la migración v2. Este repo mantiene spec + código; el estado organizacional de la iniciativa vive allí. Convención de uso: [`BQN-UY/banquinet/docs/TRACKING.md`](https://github.com/BQN-UY/banquinet/blob/main/docs/TRACKING.md).
 
+### Ritual — update al tracking issue
+
+Al cerrar un PR o issue que cambia material el estado de la migración v2, postear un **update comment** a [`banquinet#3`](https://github.com/BQN-UY/banquinet/issues/3). Previene fragmentación de contexto entre sesiones.
+
+**Aplica cuando** el cambio:
+- cierra o avanza un hito del roadmap v2 (1, 2, 2bis, 3, 4, 5),
+- cierra o identifica un bloqueo externo,
+- modifica composites, reusable workflows, templates o specs canónicos (`docs/v2-*-spec.md`, `docs/v2-*-roadmap.md`),
+- formaliza políticas (tag `v2`, IA, versionado, secrets, automation identity, ritual de tracking).
+
+**NO aplica** para cambios operativos sin impacto en estado organizacional (typos, renames internos, dependabot bumps sin cambio de API expuesta a consumers).
+
+**Formato del comment** (convención de [`TRACKING.md`](https://github.com/BQN-UY/banquinet/blob/main/docs/TRACKING.md) §2.1):
+
+```markdown
+## Update YYYY-MM-DD — <agente/sesión>
+
+- **Hito**: qué se cerró/avanzó + links a PRs/commits.
+- **Próximo**: próximos candidatos (resaltar los autónomos sin bloqueos externos).
+- **Bloqueos**: cambios en bloqueos externos.
+- **Links**: PRs, commits, issues relevantes.
+```
+
+Si además corresponde actualizar el **body** del issue (snapshot vivo — ej. marcar hito como hecho, agregar housekeeping nuevo, cambiar bloqueos activos), editar el body primero y dejar un comment corto adicional (`## Update YYYY-MM-DD — body actualizado`) explicando la edición. Nunca sobreescribir comentarios ajenos; si hay conflicto al editar el body, re-leer y re-aplicar, explicitándolo en el comentario.
+
 ## Estructura del repo
 
 ```
