@@ -38,6 +38,10 @@ Repositorio centralizado de CI/CD. Composite actions v2 viven en `.github/action
 - `v*-rc.*` → protegido (RCs auditados inmutables)
 - `v*-snapshot.*` → libre (cleanup borra)
 
+## Tag `v2` de este repo (CI-CD)
+
+Móvil por diseño — consumers referencian `BQN-UY/CI-CD@v2`. **No protegido** (requiere force-push). Mover al HEAD de main cuando el PR toca `.github/actions/**`, `.github/workflows/<stack>-*.yml` o `templates/**`. No mover para cambios doc-only (`docs/**`, `CLAUDE.md`, `copilot-instructions.md`). Comando: `git tag -f v2 origin/main && git push -f origin v2`.
+
 ## Estructura de una action v2
 
 ```
