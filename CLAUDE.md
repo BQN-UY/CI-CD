@@ -87,12 +87,12 @@ Los consumers (repos de proyecto) referencian este repo vía `BQN-UY/CI-CD@v2` e
 | Paths tocados | ¿Mueve `v2`? |
 |---|---|
 | `.github/actions/**` | Sí |
-| `.github/workflows/<stack>-*.yml` (v2) | Sí |
+| `.github/workflows/<stack>-<tipo>-*.yml` (reusables v2, ej. `scala-api-ci.yml`, `scala-lib-publish-snapshot.yml`) | Sí |
 | `templates/**` | Sí |
 | `docs/**`, `CLAUDE.md`, `.github/copilot-instructions.md` | No |
-| Workflows v1 legacy | No |
+| Resto de `.github/workflows/*.yml` (v1 legacy, lista explícita en §Reglas) | No |
 
-**Cómo mover** (post-merge, autor del PR o Pablo):
+**Cómo mover** (post-merge, a cargo del maintainer del repo):
 
 ```bash
 git fetch origin main
