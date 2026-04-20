@@ -78,6 +78,32 @@ Detalle completo en `docs/v2-hito2-deploy-spec.md` §1.
 | `v*-rc.*` | delete + force-push | RCs auditados son inmutables |
 | `v*-snapshot.*` | (libre) | cleanup workflow necesita borrarlos |
 
+## Tag `v2` de este repo
+
+Los consumers (repos de proyecto) referencian este repo vía `BQN-UY/CI-CD@v2` en sus callers. A diferencia de los tags de repos app (inmutables), **`v2` de este repo es móvil por diseño** — se mueve al HEAD de main bajo criterio explícito. **No debe estar protegido** en Settings → Tag protection (requiere force-push).
+
+**Regla — cuándo mover** (según los paths tocados por el PR mergeado):
+
+| Paths tocados | ¿Mueve `v2`? |
+|---|---|
+| `.github/actions/**` | Sí |
+| `.github/workflows/<stack>-<tipo>-*.yml` (reusables v2, ej. `scala-api-ci.yml`, `scala-lib-publish-snapshot.yml`) | Sí |
+| `templates/**` | Sí |
+| `docs/**`, `CLAUDE.md`, `.github/copilot-instructions.md` | No |
+| Resto de `.github/workflows/*.yml` (v1 legacy, lista explícita en §Reglas) | No |
+
+**Cómo mover** (post-merge, a cargo del maintainer del repo):
+
+```bash
+git fetch origin main
+git tag -f v2 origin/main
+git push -f origin v2
+```
+
+**Checkpoint por hito**: al cerrar cada hito (1, 2, 3, 4, 5), auditar con `git log v2..main --oneline` que no queden commits code-visible sin propagar.
+
+**Escape para consumers**: quien necesite congelación total puede pinear al SHA (ej. `BQN-UY/CI-CD@<sha>`) en vez de `@v2`. Cuando exista versionado semver del propio CI-CD (`vX.Y.Z`), también será opción.
+
 ## Ambientes (deploy v2 server apps)
 
 | Rama del proyecto | Ambiente | Propósito |
