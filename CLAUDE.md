@@ -13,7 +13,7 @@ Equipo, roles, restricciones estructurales, herramientas, stakeholders y políti
 
 ### Ritual — update al tracking issue
 
-Al cerrar un PR o issue que cambia material el estado de la migración v2, postear un **update comment** a [`banquinet#3`](https://github.com/BQN-UY/banquinet/issues/3). Previene fragmentación de contexto entre sesiones.
+Al cerrar un PR o issue que cambia materialmente el estado de la migración v2, postear un **update comment** a [`banquinet#3`](https://github.com/BQN-UY/banquinet/issues/3). Previene fragmentación de contexto entre sesiones.
 
 **Aplica cuando** el cambio:
 - cierra o avanza un hito del roadmap v2 (1, 2, 2bis, 3, 4, 5),
