@@ -22,7 +22,7 @@ Documento canónico del diseño del deploy GA-native que reemplaza a Jenkins en 
 
 Este Hito 2 cubre **server apps**. Client apps y libs se documentan en sus propios specs/templates cuando corresponda.
 
-> **Libs v2 — infra implementada, activación con dependencia cruzada**: los reusable workflows de libs Scala (PRs [#91](https://github.com/BQN-UY/CI-CD/pull/91)–[#94](https://github.com/BQN-UY/CI-CD/pull/94), todos mergeados) están operativos. La Fase 4 de activación depende de la decisión de identidad de automatizaciones en [`BQN-UY/banquinet#5`](https://github.com/BQN-UY/banquinet/issues/5) — no solo de los secrets técnicos de la Fase 0 de server apps. La naturaleza de las credenciales que consume `inventory.yml` y el paso de propagación `repository_dispatch` de `scala-lib-make-release.yml` (GitHub App vs PAT clásico) se decide allí. Tracking de la activación: [`BQN-UY/CI-CD#99`](https://github.com/BQN-UY/CI-CD/issues/99). Estado global: [`BQN-UY/banquinet#3`](https://github.com/BQN-UY/banquinet/issues/3).
+> **Libs v2 — infra implementada, activación con dependencia cruzada**: los reusable workflows de libs Scala (PRs [#91](https://github.com/BQN-UY/CI-CD/pull/91)–[#94](https://github.com/BQN-UY/CI-CD/pull/94), todos mergeados) están operativos. La activación end-to-end depende de la decisión de identidad de automatizaciones en [`BQN-UY/banquinet#5`](https://github.com/BQN-UY/banquinet/issues/5) — no solo de los secrets técnicos ya identificados para server apps. La naturaleza de las credenciales que consume `inventory.yml` y el paso de propagación `repository_dispatch` de `scala-lib-make-release.yml` (GitHub App vs PAT clásico) se decide allí. Tracking de la activación: [`BQN-UY/CI-CD#99`](https://github.com/BQN-UY/CI-CD/issues/99). Estado global: [`BQN-UY/banquinet#3`](https://github.com/BQN-UY/banquinet/issues/3).
 
 ```mermaid
 flowchart LR
@@ -434,4 +434,4 @@ Documentos por jerarquía de autoridad:
 
 **Cuando el usuario pregunta "¿v2 usa Jenkins?"**: NO. Ver Principio rector + `docs/v2-sin-jenkins-roadmap.md`.
 
-**Cuando el usuario pregunta sobre libs**: este spec NO las cubre — siguen el modelo Maven-standard en Nexus. Infra implementada (`templates/scala-lib/`, reusable workflows `scala-lib-*.yml`, propagación event-driven); activación (Fase 4) bloqueada por [`BQN-UY/banquinet#5`](https://github.com/BQN-UY/banquinet/issues/5) — ver nota en §1 y tracking en [`BQN-UY/CI-CD#99`](https://github.com/BQN-UY/CI-CD/issues/99).
+**Cuando el usuario pregunta sobre libs**: este spec NO las cubre — siguen el modelo Maven-standard en Nexus. Infra implementada (`templates/scala-lib/`, reusable workflows `scala-lib-*.yml`, propagación event-driven); activación end-to-end bloqueada por [`BQN-UY/banquinet#5`](https://github.com/BQN-UY/banquinet/issues/5) — ver nota en §1 y tracking en [`BQN-UY/CI-CD#99`](https://github.com/BQN-UY/CI-CD/issues/99).
