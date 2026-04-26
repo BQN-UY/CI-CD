@@ -23,7 +23,7 @@ Al cerrar un PR o issue que cambia materialmente el estado de la migración v2, 
 
 **NO aplica** para cambios operativos sin impacto en estado organizacional (typos, renames internos, dependabot bumps sin cambio de API expuesta a consumers).
 
-**Formato del comment** (convención de [`TRACKING.md`](https://github.com/BQN-UY/banquinet/blob/main/docs/TRACKING.md) §2.1):
+**Formato del comment** (convención de [`TRACKING.md`](https://github.com/BQN-UY/banquinet/blob/main/docs/TRACKING.md) §2.2):
 
 ```markdown
 ## Update YYYY-MM-DD — <agente/sesión>
