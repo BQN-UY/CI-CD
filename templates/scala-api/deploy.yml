@@ -1,9 +1,6 @@
 name: Deploy
 
 # Caller del reusable workflow de deploy v2 (GA-native, sin Jenkins).
-# NOTA: el reusable workflow está en esqueleto hasta que se cierre Hito 3
-# (ver docs/v2-sin-jenkins-roadmap.md). Este template se puede copiar ya
-# a los repos, pero no debe invocarse en producción hasta entonces.
 #
 # Requisitos del repo caller:
 #   - Tener `.github/deploy.json` válido (ver docs/deploy-json-schema.md).

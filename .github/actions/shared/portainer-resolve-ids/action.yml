@@ -1,19 +1,32 @@
 name: Portainer — resolve endpoint & container IDs
-description: Resuelve endpoint_id y container_id a partir de sus nombres vía Portainer API. Equivalente GA-native de vars/portainer.groovy (getEndopintId + getContainerIdByName).
+description: >
+  Resuelve endpoint_id y container_id a partir de nombres de compose
+  (stack + service + réplica opcional). C2 del deploy v2 — identificación
+  por labels de compose, no por nombre frágil de container.
 
 inputs:
   portainer_url:
     description: URL base de Portainer (sin trailing slash). Ej. https://docker-soporte:9443
     required: true
   portainer_token:
-    description: Token API de Portainer (X-API-KEY). Provisto desde secret del caller.
+    description: Token API de Portainer (X-API-KEY).
     required: true
   endpoint_name:
     description: Nombre del endpoint Portainer (se busca por PublicURL). Ej. docker-testing
     required: true
-  container_name:
-    description: Nombre exacto del container dentro del endpoint. Ej. acp-api_testing
+  portainer_stack:
+    description: Nombre del compose project (com.docker.compose.project). Ej. acp_services
     required: true
+  portainer_service:
+    description: Nombre del servicio compose (com.docker.compose.service). Ej. acp-api
+    required: true
+  portainer_replica:
+    description: >
+      Número de réplica (com.docker.compose.container-number). Default "1".
+      Para servicios con múltiples réplicas, cada réplica es una instalación
+      separada en deploy.json.
+    required: false
+    default: "1"
   insecure_tls:
     description: Si 'true' usa curl --insecure (self-signed cert). Default true por continuidad con v1.
     required: false
@@ -34,49 +47,70 @@ runs:
       id: resolve
       shell: bash
       env:
-        PORTAINER_URL:   ${{ inputs.portainer_url }}
-        PORTAINER_TOKEN: ${{ inputs.portainer_token }}
-        ENDPOINT_NAME:   ${{ inputs.endpoint_name }}
-        CONTAINER_NAME:  ${{ inputs.container_name }}
-        INSECURE_TLS:    ${{ inputs.insecure_tls }}
+        PORTAINER_URL:     ${{ inputs.portainer_url }}
+        PORTAINER_TOKEN:   ${{ inputs.portainer_token }}
+        ENDPOINT_NAME:     ${{ inputs.endpoint_name }}
+        PORTAINER_STACK:   ${{ inputs.portainer_stack }}
+        PORTAINER_SERVICE: ${{ inputs.portainer_service }}
+        PORTAINER_REPLICA: ${{ inputs.portainer_replica }}
+        INSECURE_TLS:      ${{ inputs.insecure_tls }}
       run: |
         set -euo pipefail
 
         if ! command -v jq &>/dev/null; then
-          echo "::error::jq is required but not installed. Add 'sudo apt-get install -y jq' before this action." >&2
+          echo "::error::jq is required but not installed." >&2
           exit 1
         fi
 
-        CURL_OPTS=(-sS --connect-timeout 10 --max-time 30 -H "X-API-KEY: ${PORTAINER_TOKEN}" -H "Content-Type: application/json")
+        CURL_OPTS=(-sS --connect-timeout 10 --max-time 30
+          -H "X-API-KEY: ${PORTAINER_TOKEN}"
+          -H "Content-Type: application/json")
         if [[ "$INSECURE_TLS" == "true" ]]; then
           CURL_OPTS+=(--insecure)
         fi
 
-        # 1) Resolve endpoint ID — match by PublicURL (mirrors vars/portainer.groovy behavior)
+        # 1) Resolve endpoint ID — match by PublicURL
         ENDPOINT_JSON=$(curl "${CURL_OPTS[@]}" \
           "${PORTAINER_URL}/api/endpoints?search=$(jq -rn --arg n "$ENDPOINT_NAME" '$n | @uri')")
 
-        ENDPOINT_ID=$(echo "$ENDPOINT_JSON" | jq --arg name "$ENDPOINT_NAME" '[.[] | select(.PublicURL == $name)][0].Id // empty')
+        ENDPOINT_ID=$(echo "$ENDPOINT_JSON" | \
+          jq --arg name "$ENDPOINT_NAME" '[.[] | select(.PublicURL == $name)][0].Id // empty')
         if [[ -z "$ENDPOINT_ID" || "$ENDPOINT_ID" == "null" ]]; then
           echo "::error::Endpoint '$ENDPOINT_NAME' not found in Portainer (searched by PublicURL)" >&2
           exit 1
         fi
         echo "Resolved endpoint '$ENDPOINT_NAME' -> id=$ENDPOINT_ID"
 
-        # 2) Resolve container ID — filter by name on Docker API, then match exact on Names[]
-        FILTER=$(jq -cn --arg n "$CONTAINER_NAME" '{name: [$n]}')
+        # 2) Resolve container ID — by compose labels (C2: stack + service + replica)
+        FILTER=$(jq -cn \
+          --arg stack   "$PORTAINER_STACK" \
+          --arg service "$PORTAINER_SERVICE" \
+          --arg replica "$PORTAINER_REPLICA" \
+          '{"label": [
+            "com.docker.compose.project=\($stack)",
+            "com.docker.compose.service=\($service)",
+            "com.docker.compose.container-number=\($replica)"
+          ]}')
         FILTER_ENC=$(jq -rn --arg f "$FILTER" '$f | @uri')
 
         CONTAINERS_JSON=$(curl "${CURL_OPTS[@]}" \
           "${PORTAINER_URL}/api/endpoints/${ENDPOINT_ID}/docker/containers/json?all=true&filters=${FILTER_ENC}")
 
-        CONTAINER_ID=$(echo "$CONTAINERS_JSON" | jq --arg name "$CONTAINER_NAME" '
-          [.[] | select((.Names // []) | map(sub("^/"; "")) | index($name))][0].Id // empty')
-        if [[ -z "$CONTAINER_ID" || "$CONTAINER_ID" == "null" ]]; then
-          echo "::error::Container '$CONTAINER_NAME' not found in endpoint '$ENDPOINT_NAME'" >&2
+        COUNT=$(echo "$CONTAINERS_JSON" | jq 'length')
+        if [[ "$COUNT" == "0" ]]; then
+          echo "::error::No container found for stack='${PORTAINER_STACK}' service='${PORTAINER_SERVICE}' replica='${PORTAINER_REPLICA}' in endpoint '${ENDPOINT_NAME}'" >&2
           exit 1
         fi
-        echo "Resolved container '$CONTAINER_NAME' -> id=${CONTAINER_ID:0:12}"
+        if [[ "$COUNT" -gt 1 ]]; then
+          echo "::warning::Multiple containers matched (count=$COUNT) — using first. Check portainer_replica in deploy.json." >&2
+        fi
 
+        CONTAINER_ID=$(echo "$CONTAINERS_JSON" | jq -r '.[0].Id // empty')
+        if [[ -z "$CONTAINER_ID" ]]; then
+          echo "::error::Could not extract container ID" >&2
+          exit 1
+        fi
+
+        echo "Resolved ${PORTAINER_STACK}/${PORTAINER_SERVICE}[${PORTAINER_REPLICA}] -> container ${CONTAINER_ID:0:12}"
         echo "endpoint_id=$ENDPOINT_ID"   >> "$GITHUB_OUTPUT"
         echo "container_id=$CONTAINER_ID" >> "$GITHUB_OUTPUT"

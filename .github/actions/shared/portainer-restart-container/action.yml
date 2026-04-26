@@ -1,0 +1,59 @@
+name: Portainer — restart container
+description: Reinicia un container vía Portainer API (POST /restart). D1 del deploy v2 — restart siempre forzado, sin flag ni opt-out.
+
+inputs:
+  portainer_url:
+    description: URL base de Portainer (sin trailing slash). Ej. https://docker-soporte:9443
+    required: true
+  portainer_token:
+    description: Token API de Portainer (X-API-KEY).
+    required: true
+  endpoint_id:
+    description: ID numérico del endpoint Portainer (obtenido con portainer-resolve-ids).
+    required: true
+  container_id:
+    description: ID del container Docker dentro del endpoint.
+    required: true
+  insecure_tls:
+    description: Si 'true' usa curl --insecure (self-signed cert). Default true por continuidad con v1.
+    required: false
+    default: "true"
+
+runs:
+  using: composite
+  steps:
+    - name: Restart container
+      shell: bash
+      env:
+        PORTAINER_URL:   ${{ inputs.portainer_url }}
+        PORTAINER_TOKEN: ${{ inputs.portainer_token }}
+        ENDPOINT_ID:     ${{ inputs.endpoint_id }}
+        CONTAINER_ID:    ${{ inputs.container_id }}
+        INSECURE_TLS:    ${{ inputs.insecure_tls }}
+      run: |
+        set -euo pipefail
+
+        CURL_OPTS=(-sS --connect-timeout 10 --max-time 60
+          -H "X-API-KEY: ${PORTAINER_TOKEN}"
+          -o /dev/null -w "%{http_code}")
+        if [[ "$INSECURE_TLS" == "true" ]]; then
+          CURL_OPTS+=(--insecure)
+        fi
+
+        HTTP_STATUS=$(curl "${CURL_OPTS[@]}" -X POST \
+          "${PORTAINER_URL}/api/endpoints/${ENDPOINT_ID}/docker/containers/${CONTAINER_ID}/restart")
+
+        # Docker semantics: 204 = restarted OK, 404 = container not found, 500 = server error
+        case "$HTTP_STATUS" in
+          204)
+            echo "Container restarted (HTTP 204)"
+            ;;
+          404)
+            echo "::error::Container not found (HTTP 404) — endpoint_id=${ENDPOINT_ID} container_id=${CONTAINER_ID:0:12}" >&2
+            exit 1
+            ;;
+          *)
+            echo "::error::Failed to restart container — HTTP $HTTP_STATUS" >&2
+            exit 1
+            ;;
+        esac
