@@ -28,19 +28,31 @@ on:
         required: false
         default: ""
 
-  # Disparadores automáticos (cuando Hito 3 esté listo, descomentar según política):
-  #
-  # release:
-  #   types: [published]        # auto-deploy a testing en snapshots / staging en rc / production manual
-  #
+  # Auto-deploy según convención de versionado v2:
+  #   v*-snapshot.NNN → testing   (auto)
+  #   v*-rc.NNN       → staging   (auto)
+  #   vX.Y.Z (final)  → production (siempre manual via workflow_dispatch)
+  release:
+    types: [published]
 
 jobs:
   deploy:
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'release' && (
+        contains(github.event.release.tag_name, '-snapshot.') ||
+        contains(github.event.release.tag_name, '-rc.')
+      ))
     uses: BQN-UY/CI-CD/.github/workflows/scala-api-deploy.yml@v2
     with:
-      environment:   ${{ inputs.environment }}
-      version:       ${{ inputs.version }}
-      installations: ${{ inputs.installations }}
+      environment: >-
+        ${{ github.event_name == 'workflow_dispatch' && inputs.environment
+            || (contains(github.event.release.tag_name, '-snapshot.') && 'testing' || 'staging') }}
+      version: >-
+        ${{ github.event_name == 'workflow_dispatch' && inputs.version
+            || github.event.release.tag_name }}
+      installations: >-
+        ${{ github.event_name == 'workflow_dispatch' && inputs.installations || '' }}
     secrets:
       PORTAINER_TOKEN_DEPLOY:        ${{ secrets.PORTAINER_TOKEN_DEPLOY }}
       GCHAT_WEBHOOK_PRODUCTION:      ${{ secrets.GCHAT_WEBHOOK_PRODUCTION }}
