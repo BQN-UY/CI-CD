@@ -27,17 +27,16 @@ Incluir `$schema` al inicio del archivo para habilitar validación en editores (
 
 ```
 application_type (str, requerido, enum)
-environments (obj, requerido)
- └── testing | staging | production (al menos uno)
+environments (obj, requerido, ≥1 ambiente)
+ └── testing | staging | production
       └── installations[] (array, requerido, ≥1)
-           ├── name                  (str, requerido, único en el ambiente)
-           ├── portainer_endpoint    (str, requerido)
-           ├── portainer_container   (str, requerido)
-           ├── auto_deploy           (bool, default false)
-           └── artifact (obj, requerido)
-                ├── deploy_path      (str, requerido, path absoluto)
-                ├── extension        (str, requerido, "war" | "jar")
-                └── target_name      (str, opcional, default = name)
+           ├── name                 (str, requerido, único en el ambiente)
+           ├── portainer_endpoint   (str, requerido)
+           ├── portainer_stack      (str, requerido — compose project)
+           ├── portainer_service    (str, requerido — compose service)
+           ├── portainer_replica    (int, opcional, default 1)
+           ├── executable_path      (str, requerido, path absoluto dentro del container)
+           └── auto_deploy          (bool, opcional, default false)
 ```
 
 ### `application_type` — tipo de aplicación
@@ -56,7 +55,7 @@ Declara el stack + forma del artefacto. Alinea con la taxonomía `templates/<sta
 
 **Motivación**:
 - Self-describing: el workflow de inventario agrega tipo sin peek-ar al `build.sbt` / `pyproject.toml` de cada repo.
-- Validación de coherencia: el schema rechaza combinaciones inválidas (`scala-api` con `extension: war`).
+- Validación de coherencia: el schema rechaza combinaciones inválidas (`scala-api` con `executable_path` terminado en `.war`, o `scala-vaadin` terminado en `.jar`).
 - Defensa en profundidad: el reusable workflow que invoca deploy puede verificar que `application_type` coincide con el suyo, evitando que un repo apunte por error al template equivocado.
 - Futuro: agregar un stack nuevo = un valor al enum + un template dedicado. No hay lógica dispersa.
 
@@ -74,12 +73,10 @@ Declara el stack + forma del artefacto. Alinea con la taxonomía `templates/<sta
         {
           "name": "acp-api_testing",
           "portainer_endpoint": "docker-testing",
-          "portainer_container": "acp-api_testing",
-          "auto_deploy": true,
-          "artifact": {
-            "deploy_path": "/opt/webapps",
-            "extension": "jar"
-          }
+          "portainer_stack": "acp_services",
+          "portainer_service": "acp-api",
+          "executable_path": "/app/lib/acp-api.jar",
+          "auto_deploy": true
         }
       ]
     },
@@ -88,12 +85,10 @@ Declara el stack + forma del artefacto. Alinea con la taxonomía `templates/<sta
         {
           "name": "acp-api_staging",
           "portainer_endpoint": "docker-staging",
-          "portainer_container": "acp-api_staging",
-          "auto_deploy": true,
-          "artifact": {
-            "deploy_path": "/opt/webapps",
-            "extension": "jar"
-          }
+          "portainer_stack": "acp_services",
+          "portainer_service": "acp-api",
+          "executable_path": "/app/lib/acp-api.jar",
+          "auto_deploy": true
         }
       ]
     },
@@ -102,24 +97,18 @@ Declara el stack + forma del artefacto. Alinea con la taxonomía `templates/<sta
         {
           "name": "acp-api_crl",
           "portainer_endpoint": "docker-prod-01",
-          "portainer_container": "acp-api_crl",
-          "auto_deploy": true,
-          "artifact": {
-            "deploy_path": "/opt/webapps",
-            "extension": "jar",
-            "target_name": "acp-api"
-          }
+          "portainer_stack": "acp_crl",
+          "portainer_service": "acp-api",
+          "executable_path": "/app/lib/acp-api.jar",
+          "auto_deploy": false
         },
         {
           "name": "acp-api_lpi",
           "portainer_endpoint": "docker-prod-01",
-          "portainer_container": "acp-api_lpi",
-          "auto_deploy": true,
-          "artifact": {
-            "deploy_path": "/opt/webapps",
-            "extension": "jar",
-            "target_name": "acp-api"
-          }
+          "portainer_stack": "acp_lpi",
+          "portainer_service": "acp-api",
+          "executable_path": "/app/lib/acp-api.jar",
+          "auto_deploy": false
         }
       ]
     }
@@ -135,12 +124,12 @@ Declara el stack + forma del artefacto. Alinea con la taxonomía `templates/<sta
 |---|---|
 | `environments.<env>` | Uno de `testing`, `staging`, `production`. Solo se definen los ambientes en los que la app deploya. |
 | `installations[].name` | Identificador de la instalación dentro del ambiente. Único. Se usa como valor en el dropdown de deploy manual (`workflow_dispatch`). Convención: `<sistema>_<variante>`. |
-| `portainer_endpoint` | Nombre del endpoint Portainer (no ID). Se resuelve a ID vía `GET /api/endpoints?search=<name>` al momento del deploy. |
-| `portainer_container` | Nombre del container en ese endpoint. Se resuelve a ID vía `GET /api/endpoints/{id}/docker/containers/json?filters=...`. |
+| `portainer_endpoint` | Nombre del endpoint Portainer (PublicURL, no ID). Se resuelve a ID vía `GET /api/endpoints?search=<name>` al momento del deploy. |
+| `portainer_stack` | Nombre del compose project — label `com.docker.compose.project` del container. Junto con `portainer_service` + `portainer_replica` resuelve el container ID por labels (C2 — robusto frente a renames del container). |
+| `portainer_service` | Nombre del servicio compose — label `com.docker.compose.service` del container. |
+| `portainer_replica` | Número de réplica — label `com.docker.compose.container-number`. Default `1`. Para servicios escalados (≥2 réplicas), declarar una instalación por réplica. |
+| `executable_path` | Path absoluto del artefacto **dentro del container** (ej. `/app/lib/acp-api.jar`). El directorio padre debe existir; el archivo se PUT'a vía Portainer `/archive` con el basename de este path. La extensión se valida cruzada con `application_type` (regex `\.jar$` para `scala-api`, `\.war$` para `scala-vaadin`). |
 | `auto_deploy` | Si `true`, la instalación se incluye cuando el deploy se dispara sin selección manual (push → deploy automático a testing/staging). Si `false` u omitido, solo se deploya si se selecciona explícitamente (típico para production). |
-| `artifact.deploy_path` | Path absoluto en el host donde copiar el archivo (montado como bind-mount al container). Convención actual en BQN: `/opt/webapps`. |
-| `artifact.extension` | `war` (servlet en Tomcat) o `jar` (standalone). |
-| `artifact.target_name` | Nombre con que se renombra el archivo al copiarlo (sin extensión). Si se omite, se usa `installations[].name`. Útil cuando el container espera un nombre fijo (ej. Tomcat espera `ROOT.war`) distinto al nombre lógico de la instalación. |
 
 ---
 
@@ -156,17 +145,31 @@ La estructura de v1 era:
 }
 ```
 
+v2 cambió la identificación de container (de nombre frágil a labels de compose) y unificó `artifact.{deploy_path,extension,target_name}` en un único `executable_path`. La migración no es campo-a-campo: requiere consultar las labels de compose del container existente.
+
 Para migrar un app de v1 a v2:
 
 1. **Localizar** la entrada del app en `BQN-UY/jenkins/config/sistemas.json` (por `apps[].name`).
-2. **Transformar** al schema v2:
+2. **Para cada installation v1**, consultar las labels de compose del container actual (autenticado con un token Portainer con read-only):
+   ```bash
+   curl -sS --insecure \
+     -H "X-API-KEY: $PORTAINER_TOKEN" \
+     "$PORTAINER_URL/api/endpoints/$ENDPOINT_ID/docker/containers/$CONTAINER_NAME/json" \
+     | jq '.Config.Labels | {
+         project: ."com.docker.compose.project",
+         service: ."com.docker.compose.service",
+         number:  ."com.docker.compose.container-number"
+       }'
+   ```
+3. **Transformar** al schema v2:
    - Quitar el wrapper `apps[]` — el repo _es_ el app.
    - **Agregar** `application_type` al tope (según el stack del repo).
    - Cambiar `environments[]` (array con `name` interno) por `environments` (objeto con keys `testing` / `staging` / `production`).
-   - Copiar cada installation tal cual (los campos coinciden: `name`, `portainer_endpoint`, `portainer_container`, `auto_deploy`, `artifact.{deploy_path,extension,target_name}`).
+   - Reemplazar `portainer_container` por la triple `portainer_stack` / `portainer_service` / `portainer_replica` (`compose.project` / `compose.service` / `compose.container-number` extraídos en el paso 2).
+   - Reemplazar `artifact.{deploy_path, extension, target_name}` por un único `executable_path`. Si en v1 el artefacto se copiaba a `${deploy_path}/${target_name|name}.${extension}` (path en el host bind-mounted), en v2 el `executable_path` debe ser ese mismo path **tal cual lo ve el container** (típicamente coincide cuando el bind-mount es idéntico; verificar con `docker inspect` si la ruta dentro del container difiere).
    - **Descartar** el campo `database.{name,servedata_server}`: pertenece al flujo de restore DB, que se aborda en su propio hito (fuera de scope Hito 2).
-3. **Agregar** `$schema` al inicio para habilitar validación.
-4. **Commit** del `.github/deploy.json` junto con el PR de migración del app a v2.
+4. **Agregar** `$schema` al inicio para habilitar validación.
+5. **Commit** del `.github/deploy.json` junto con el PR de migración del app a v2.
 
 ### Ejemplo de transformación
 
@@ -186,7 +189,7 @@ v1 (fragmento de `sistemas.json`):
               "portainer_endpoint": "docker-testing",
               "portainer_container": "sga_testing",
               "auto_deploy": true,
-              "artifact": { "deploy_path": "/opt/webapps", "extension": "war" },
+              "artifact": { "deploy_path": "/opt/webapps", "extension": "war", "target_name": "ROOT" },
               "database": { "name": "sga_crl", "servedata_server": "servedata-testing" }
             }
           ]
@@ -197,21 +200,24 @@ v1 (fragmento de `sistemas.json`):
 }
 ```
 
+Asumiendo que `docker inspect sga_testing` devuelve labels `compose.project=sga_services`, `compose.service=sga`, `compose.container-number=1`, y que el bind-mount monta `/opt/webapps` del host en `/opt/webapps` del container:
+
 v2 (`.github/deploy.json` en el repo `sga`):
 
 ```json
 {
   "$schema": "https://raw.githubusercontent.com/BQN-UY/CI-CD/v2/schemas/deploy.schema.json",
-  "application_type": "scala-api",
+  "application_type": "scala-vaadin",
   "environments": {
     "testing": {
       "installations": [
         {
           "name": "sga_testing",
           "portainer_endpoint": "docker-testing",
-          "portainer_container": "sga_testing",
-          "auto_deploy": true,
-          "artifact": { "deploy_path": "/opt/webapps", "extension": "war" }
+          "portainer_stack": "sga_services",
+          "portainer_service": "sga",
+          "executable_path": "/opt/webapps/ROOT.war",
+          "auto_deploy": true
         }
       ]
     }

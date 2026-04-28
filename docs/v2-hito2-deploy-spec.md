@@ -242,7 +242,7 @@ Cada app declara su config de deploy en su propio repo, versionada junto al cód
 1. **Pérdida de vista global** → mitigado por §4.10 (inventario agregado generado).
 2. **Cambios transversales más caros** (renombrar un endpoint Portainer = N PRs en vez de 1) → tolerable por baja frecuencia (~mensual a anual) y automatizable con `gh api` multi-repo.
 3. **Riesgo de drift estructural** entre repos → mitigado por **JSON Schema compartido** publicado en CI-CD repo, referenciado con `$schema` en cada `deploy.json`.
-4. **Colisiones cross-repo no detectables localmente** (ej. dos apps declarando el mismo `container_name` en el mismo endpoint) → mitigado por validador org-wide ejecutado por el mismo workflow de §4.10.
+4. **Colisiones cross-repo no detectables localmente** (ej. dos apps declarando la misma triple `portainer_stack`/`portainer_service`/`portainer_replica` en el mismo endpoint) → mitigado por validador org-wide ejecutado por el mismo workflow de §4.10.
 
 **Punto de revisión futuro**: si la cantidad de server apps supera ~50 o los cambios transversales se vuelven mensuales, evaluar modelo híbrido (valores de infra como vars de GH Environment a nivel org, `deploy.json` solo con lo específico del app).
 
@@ -250,7 +250,7 @@ Cada app declara su config de deploy en su propio repo, versionada junto al cód
 
 - Alinea con la taxonomía `templates/<stack>-<tipo>/` y `<stack>-<tipo>-*.yml` del repo CI-CD.
 - **Self-describing**: el workflow de inventario (§4.10) agrega tipo sin tener que inferirlo de `build.sbt` / `pyproject.toml`.
-- **Validación de coherencia**: el schema rechaza `scala-api` con `extension: war` (vía `if/then`). Evita errores al copiar configs entre repos.
+- **Validación de coherencia**: el schema rechaza `scala-api` cuyo `executable_path` no termine en `.jar`, y `scala-vaadin` que no termine en `.war` (vía `if/then` con regex sobre el path). Evita errores al copiar configs entre repos.
 - **Defensa en profundidad**: el reusable workflow puede verificar que `application_type` del repo coincide con el suyo antes de ejecutar.
 
 Libs **no** llevan `deploy.json` (no deployan — publican a Nexus), por lo que el enum solo lista tipos deployables. Detalle del schema en `docs/deploy-json-schema.md`.
@@ -263,7 +263,7 @@ Libs **no** llevan `deploy.json` (no deployan — publican a Nexus), por lo que 
 - **Contenido**:
   1. **Estado de migración v2** (ver §4.11) — tabla por repo.
   2. **Inventario de deploys** — por cada (sistema, ambiente, instalación): endpoint Portainer, container, path, auto_deploy.
-  3. **Validación cruzada** — colisiones de `container_name` en el mismo endpoint, endpoints referenciados que no existen en el inventario real de Portainer (si es posible validar), violaciones de schema.
+  3. **Validación cruzada** — colisiones de la triple `portainer_stack`/`portainer_service`/`portainer_replica` en el mismo endpoint, endpoints referenciados que no existen en el inventario real de Portainer (si es posible validar), violaciones de schema.
 - **Ownership**: lo mantiene CI-CD repo; Soporte lo usa como reemplazo de la vista global que hoy da `sistemas.json`.
 
 Detalle de implementación en Hito 3.
