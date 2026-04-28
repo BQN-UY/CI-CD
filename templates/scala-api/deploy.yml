@@ -4,7 +4,9 @@ name: Deploy
 #
 # Requisitos del repo caller:
 #   - Tener `.github/deploy.json` válido (ver docs/deploy-json-schema.md).
-#   - Org secret `PORTAINER_TOKEN` y var `PORTAINER_URL` configurados.
+#   - Org var `PORTAINER_URL` y org secrets aprovisionados por Fase 0
+#     (BQN-UY/CI-CD#95): PORTAINER_TOKEN_DEPLOY,
+#     GCHAT_WEBHOOK_PRODUCTION, GCHAT_WEBHOOK_TESTING_STAGING.
 #   - GH Environments `testing`/`staging`/`production` con required reviewers
 #     en production.
 
@@ -40,5 +42,6 @@ jobs:
       version:       ${{ inputs.version }}
       installations: ${{ inputs.installations }}
     secrets:
-      PORTAINER_TOKEN:   ${{ secrets.PORTAINER_TOKEN }}
-      CHAT_WEBHOOK_URL:  ${{ secrets.CHAT_WEBHOOK_URL }}
+      PORTAINER_TOKEN_DEPLOY:        ${{ secrets.PORTAINER_TOKEN_DEPLOY }}
+      GCHAT_WEBHOOK_PRODUCTION:      ${{ secrets.GCHAT_WEBHOOK_PRODUCTION }}
+      GCHAT_WEBHOOK_TESTING_STAGING: ${{ secrets.GCHAT_WEBHOOK_TESTING_STAGING }}
