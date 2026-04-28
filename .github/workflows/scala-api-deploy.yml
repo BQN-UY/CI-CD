@@ -86,11 +86,45 @@ jobs:
     if: needs.plan.outputs.count != '0'
     runs-on: [self-hosted, bqn-deploy]
     environment: ${{ inputs.environment }}
+    permissions:
+      contents:    read
+      deployments: write
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.plan.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Create deployment record
+        id: deployment
+        env:
+          GH_TOKEN:     ${{ github.token }}
+          ENVIRONMENT:  ${{ inputs.environment }}
+          VERSION:      ${{ inputs.version }}
+          INSTALLATION: ${{ matrix.name }}
+          LOG_URL:      ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          PROD=$([[ "$ENVIRONMENT" == "production" ]] && echo true || echo false)
+          DEPLOYMENT_ID=$(gh api --method POST \
+            "repos/${GITHUB_REPOSITORY}/deployments" \
+            -f ref="$VERSION" \
+            -f environment="$ENVIRONMENT" \
+            -f description="$INSTALLATION via GH Actions" \
+            -F auto_merge=false \
+            -F production_environment=$PROD \
+            -F required_contexts='[]' \
+            --jq '.id')
+          echo "id=$DEPLOYMENT_ID" >> "$GITHUB_OUTPUT"
+          echo "Created deployment ${DEPLOYMENT_ID} for ${INSTALLATION} → ${ENVIRONMENT} (${VERSION})"
+
+          gh api --method POST \
+            "repos/${GITHUB_REPOSITORY}/deployments/${DEPLOYMENT_ID}/statuses" \
+            -f state=in_progress \
+            -f environment="$ENVIRONMENT" \
+            -f log_url="$LOG_URL" \
+            -f description="Started" >/dev/null
 
       # insecure_tls=true en los 3 steps Portainer: docker-soporte usa cert
       # self-signed (continuidad con v1). Los composites defaultean a false
@@ -144,6 +178,40 @@ jobs:
           endpoint_id:     ${{ steps.ids.outputs.endpoint_id }}
           container_id:    ${{ steps.ids.outputs.container_id }}
           insecure_tls:    "true"
+
+      - name: Mark deployment success
+        if: success() && steps.deployment.outputs.id != ''
+        env:
+          GH_TOKEN:      ${{ github.token }}
+          ENVIRONMENT:   ${{ inputs.environment }}
+          DEPLOYMENT_ID: ${{ steps.deployment.outputs.id }}
+          LOG_URL:       ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api --method POST \
+            "repos/${GITHUB_REPOSITORY}/deployments/${DEPLOYMENT_ID}/statuses" \
+            -f state=success \
+            -f environment="$ENVIRONMENT" \
+            -f log_url="$LOG_URL" \
+            -f description="Deploy completed" >/dev/null
+
+      - name: Mark deployment failure
+        if: failure() && steps.deployment.outputs.id != ''
+        env:
+          GH_TOKEN:      ${{ github.token }}
+          ENVIRONMENT:   ${{ inputs.environment }}
+          DEPLOYMENT_ID: ${{ steps.deployment.outputs.id }}
+          LOG_URL:       ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api --method POST \
+            "repos/${GITHUB_REPOSITORY}/deployments/${DEPLOYMENT_ID}/statuses" \
+            -f state=failure \
+            -f environment="$ENVIRONMENT" \
+            -f log_url="$LOG_URL" \
+            -f description="Deploy failed" >/dev/null
 
   # ---------------------------------------------------------------------------
   # Notify: resumen a Google Chat. Corre siempre (éxito o fallo).
