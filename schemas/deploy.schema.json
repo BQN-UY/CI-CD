@@ -1,0 +1,137 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/BQN-UY/CI-CD/v2/schemas/deploy.schema.json",
+  "title": "BQN-UY — .github/deploy.json",
+  "description": "Config de deploy v2 para server apps. Reemplaza sistemas.json de v1. Ver docs/deploy-json-schema.md y docs/v2-hito2-deploy-spec.md §4.9.",
+  "type": "object",
+  "required": ["application_type", "environments"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Referencia al schema (permitido para habilitar validación en editores)."
+    },
+    "application_type": {
+      "type": "string",
+      "description": "Tipo de aplicación. Alinea con la taxonomía templates/<stack>-<tipo>/ y los reusable workflows <stack>-<tipo>-*.yml. Las libs no llevan deploy.json.",
+      "enum": ["scala-api", "scala-vaadin", "scala-web", "python-api", "node-api"]
+    },
+    "environments": {
+      "type": "object",
+      "description": "Mapping de ambiente a su lista de instalaciones.",
+      "minProperties": 1,
+      "additionalProperties": false,
+      "properties": {
+        "testing":    { "$ref": "#/$defs/environment" },
+        "staging":    { "$ref": "#/$defs/environment" },
+        "production": { "$ref": "#/$defs/environment" }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if":   { "properties": { "application_type": { "const": "scala-api" } }, "required": ["application_type"] },
+      "then": { "$ref": "#/$defs/executablePathMustEndJar" }
+    },
+    {
+      "if":   { "properties": { "application_type": { "const": "scala-vaadin" } }, "required": ["application_type"] },
+      "then": { "$ref": "#/$defs/executablePathMustEndWar" }
+    }
+  ],
+  "$defs": {
+    "executablePathMustEndJar": {
+      "properties": {
+        "environments": {
+          "properties": {
+            "testing":    { "$ref": "#/$defs/allInstallationsJar" },
+            "staging":    { "$ref": "#/$defs/allInstallationsJar" },
+            "production": { "$ref": "#/$defs/allInstallationsJar" }
+          }
+        }
+      }
+    },
+    "executablePathMustEndWar": {
+      "properties": {
+        "environments": {
+          "properties": {
+            "testing":    { "$ref": "#/$defs/allInstallationsWar" },
+            "staging":    { "$ref": "#/$defs/allInstallationsWar" },
+            "production": { "$ref": "#/$defs/allInstallationsWar" }
+          }
+        }
+      }
+    },
+    "allInstallationsJar": {
+      "properties": {
+        "installations": {
+          "items": { "properties": { "executable_path": { "pattern": "\\.jar$" } } }
+        }
+      }
+    },
+    "allInstallationsWar": {
+      "properties": {
+        "installations": {
+          "items": { "properties": { "executable_path": { "pattern": "\\.war$" } } }
+        }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "required": ["installations"],
+      "additionalProperties": false,
+      "properties": {
+        "installations": {
+          "type": "array",
+          "description": "Instalaciones que se deployan en este ambiente.",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/installation" }
+        }
+      }
+    },
+    "installation": {
+      "type": "object",
+      "required": ["name", "portainer_endpoint", "portainer_stack", "portainer_service", "executable_path"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Identificador único de la instalación dentro del ambiente. Usado en logs y en selección manual vía workflow_dispatch.",
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "portainer_endpoint": {
+          "type": "string",
+          "description": "Nombre del endpoint Portainer (PublicURL). Ej. docker-testing",
+          "minLength": 1
+        },
+        "portainer_stack": {
+          "type": "string",
+          "description": "Nombre del compose project (com.docker.compose.project). Ej. acp_services",
+          "minLength": 1
+        },
+        "portainer_service": {
+          "type": "string",
+          "description": "Nombre del servicio compose (com.docker.compose.service). Ej. acp-api",
+          "minLength": 1
+        },
+        "portainer_replica": {
+          "type": "integer",
+          "description": "Número de réplica (com.docker.compose.container-number). Default 1. Para servicios con múltiples réplicas, declarar una instalación por réplica.",
+          "minimum": 1,
+          "default": 1
+        },
+        "executable_path": {
+          "type": "string",
+          "description": "Path completo del artefacto dentro del container. Ej. /app/lib/acp-api.jar — el directorio debe existir en el container.",
+          "pattern": "^/.+"
+        },
+        "auto_deploy": {
+          "type": "boolean",
+          "description": "Si true, la instalación se incluye cuando el deploy no especifica selección manual. Default false.",
+          "default": false
+        }
+      }
+    }
+  }
+}

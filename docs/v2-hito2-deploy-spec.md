@@ -221,6 +221,74 @@ Decisiones base del modelo de artefactos y versionado (heredadas de Hito 2 origi
 ### 4.6 Restore DB
 ✅ Fuera de scope Hito 2 — se aborda en hito propio (operativos en GA, alineado con informe Jenkins §10 Fase 3).
 
+### 4.9 Config de deploy: descentralizada por repo (`.github/deploy.json`)
+
+✅ Reemplaza el `sistemas.json` centralizado de v1 (en `BQN-UY/jenkins/config/sistemas.json`).
+Cada app declara su config de deploy en su propio repo, versionada junto al código.
+
+**Motivación del cambio**:
+
+| Dimensión | v1 centralizado (`sistemas.json`) | v2 descentralizado (`.github/deploy.json`) |
+|---|---|---|
+| Atomicidad código ↔ config | Requiere coordinar 2 PRs en 2 repos | Un solo PR — merge = app+config consistentes |
+| Branching | Config única, compartida entre ramas | `release/vX.Y.Z` puede llevar su propia config |
+| Rollback | Revertir tag NO revierte config | Revertir tag revierte código **y** config |
+| Ownership | Difuso (Soporte edita, devs no ven) | Claro — equipo del repo es dueño |
+| Aislamiento de fallas | Typo puede tumbar deploys ajenos | Typo afecta solo al repo |
+| Principio Rector v2 | Acopla v2 a repo legacy `BQN-UY/jenkins` | v2 100% independiente de Jenkins |
+
+**Costos asumidos y mitigaciones**:
+
+1. **Pérdida de vista global** → mitigado por §4.10 (inventario agregado generado).
+2. **Cambios transversales más caros** (renombrar un endpoint Portainer = N PRs en vez de 1) → tolerable por baja frecuencia (~mensual a anual) y automatizable con `gh api` multi-repo.
+3. **Riesgo de drift estructural** entre repos → mitigado por **JSON Schema compartido** publicado en CI-CD repo, referenciado con `$schema` en cada `deploy.json`.
+4. **Colisiones cross-repo no detectables localmente** (ej. dos apps declarando la misma triple `portainer_stack`/`portainer_service`/`portainer_replica` en el mismo endpoint) → mitigado por validador org-wide ejecutado por el mismo workflow de §4.10.
+
+**Punto de revisión futuro**: si la cantidad de server apps supera ~50 o los cambios transversales se vuelven mensuales, evaluar modelo híbrido (valores de infra como vars de GH Environment a nivel org, `deploy.json` solo con lo específico del app).
+
+**Campo `application_type`**: el schema exige un campo top-level `application_type` (enum: `scala-api`, `scala-vaadin`, `scala-web`, `python-api`, `node-api`). Motivación:
+
+- Alinea con la taxonomía `templates/<stack>-<tipo>/` y `<stack>-<tipo>-*.yml` del repo CI-CD.
+- **Self-describing**: el workflow de inventario (§4.10) agrega tipo sin tener que inferirlo de `build.sbt` / `pyproject.toml`.
+- **Validación de coherencia**: el schema rechaza `scala-api` cuyo `executable_path` no termine en `.jar`, y `scala-vaadin` que no termine en `.war` (vía `if/then` con regex sobre el path). Evita errores al copiar configs entre repos.
+- **Defensa en profundidad**: el reusable workflow puede verificar que `application_type` del repo coincide con el suyo antes de ejecutar.
+
+Libs **no** llevan `deploy.json` (no deployan — publican a Nexus), por lo que el enum solo lista tipos deployables. Detalle del schema en `docs/deploy-json-schema.md`.
+
+### 4.10 Inventario global generado (mitigación de 4.9)
+
+✅ Workflow cron en el repo CI-CD que agrega todos los `.github/deploy.json` de la org BQN-UY y publica un documento de inventario (p.ej. `docs/inventory.md`) o un issue actualizado.
+
+- **Frecuencia**: semanal (suficiente para auditoría; no se busca tiempo real).
+- **Contenido**:
+  1. **Estado de migración v2** (ver §4.11) — tabla por repo.
+  2. **Inventario de deploys** — por cada (sistema, ambiente, instalación): endpoint Portainer, container, path, auto_deploy.
+  3. **Validación cruzada** — colisiones de la triple `portainer_stack`/`portainer_service`/`portainer_replica` en el mismo endpoint, endpoints referenciados que no existen en el inventario real de Portainer (si es posible validar), violaciones de schema.
+- **Ownership**: lo mantiene CI-CD repo; Soporte lo usa como reemplazo de la vista global que hoy da `sistemas.json`.
+
+Detalle de implementación en Hito 3.
+
+### 4.11 Registro de estado de migración v2 (derivado del inventario)
+
+✅ El mismo workflow de §4.10 clasifica cada repo de la org por estado de migración, sin registro manual.
+
+**Clasificación automática** (derivada de artefactos del repo):
+
+| Estado | Señal detectable |
+|---|---|
+| ✅ **v2 completo** | Tiene `.github/deploy.json` + workflows invocan `BQN-UY/CI-CD/.github/workflows/<stack>-<tipo>-*.yml@v2` |
+| 🟡 **v2 publish-only** | Usa workflows `@v2` pero sin `.github/deploy.json` (estado transicional — publica artefactos pero no deploya; ej. acp-api hoy) |
+| 🔴 **v1 legacy** | Workflows invocan `scala-deploy-*.yml` / `scala-make-release-*.yml` sin tag `@v2` |
+| ⚪ **N/A** | Repo sin workflows de deploy (lib, archivado, experimental, no es server app) |
+
+**Motivación**:
+- **No-drift por construcción**: nadie mantiene la lista — el estado es *efecto observado* del PR de migración (agregar `deploy.json`, cambiar tag `@v2`). El registro converge automáticamente.
+- **Cero artefactos nuevos por repo**: no hay que agregar archivos de versión, topics, labels u otro tracker por repo.
+- **Zero ceremonia de actualización**: la acción humana ya está implícita en el PR de migración.
+- **Alternativas descartadas**: lista manual (drifta), topic/label GH (requiere acción extra post-merge), archivo de versión dedicado (boilerplate innecesario).
+
+**Salida**: sección al tope del inventario (`docs/inventory.md`) con tabla por repo + contador de progreso global (`N ✅ / M 🟡 / K 🔴 / X ⚪ — Y% completo`). Sirve para reporte ejecutivo y para identificar la próxima ola de migración.
+
 ---
 
 Decisiones de diseño del deploy GA-native (razonamiento extendido en [`v2-deploy-design-proposal-soporte.md`](./v2-deploy-design-proposal-soporte.md)):
@@ -339,9 +407,9 @@ El spec se considera completo cuando responde:
 - [x] (D5) Approvers prod + fusible SoD
 - [x] (D6) Paths intra-container
 - [x] (D7) Auto-deploy opt-in per-instalación
-- [ ] (C1) Arquitectura del runner — viabilidad de Opción C (consulta abierta con Soporte)
-- [ ] (C2) Identificación de containers — réplicas y casos standalone (consulta abierta con Soporte)
-- [ ] Conformidad firmada de Soporte Operativo sobre `v2-deploy-design-proposal-soporte.md`
+- [x] (C1) Arquitectura del runner — Opción C viable (todos bind-mounted, confirmado Soporte 2026-04-15)
+- [x] (C2) Identificación de containers — por stack+service+replicas (confirmado Soporte 2026-04-15)
+- [x] Conformidad de Soporte Operativo — CI-CD#98 cerrado 2026-04-16 (Bruno Artola)
 - [ ] Diseño del composite `shared/deploy-*` y workflow `scala-api-deploy.yml` (Hito 3)
 - [ ] Criterio de migración: cómo un repo v2 publish-only adopta el deploy GA-native (PR mecánico, Hito 3)
 
