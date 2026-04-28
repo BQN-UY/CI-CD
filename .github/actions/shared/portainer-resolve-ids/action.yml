@@ -28,9 +28,12 @@ inputs:
     required: false
     default: "1"
   insecure_tls:
-    description: Si 'true' usa curl --insecure (self-signed cert). Default true por continuidad con v1.
+    description: >
+      Si 'true' usa curl --insecure (deshabilita verificación TLS). Default false
+      por seguridad. El caller debe setearlo a "true" explícitamente cuando el
+      Portainer destino use cert self-signed.
     required: false
-    default: "true"
+    default: "false"
 
 outputs:
   endpoint_id:

@@ -92,6 +92,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # insecure_tls=true en los 3 steps Portainer: docker-soporte usa cert
+      # self-signed (continuidad con v1). Los composites defaultean a false
+      # por seguridad; lo activamos explícitamente acá.
       - name: Resolve Portainer IDs
         id: ids
         uses: BQN-UY/CI-CD/.github/actions/shared/portainer-resolve-ids@v2
@@ -102,6 +105,7 @@ jobs:
           portainer_stack:   ${{ matrix.portainer_stack }}
           portainer_service: ${{ matrix.portainer_service }}
           portainer_replica: ${{ matrix.portainer_replica || '1' }}
+          insecure_tls:      "true"
 
       - name: Download artifact from GH Release
         id: download
@@ -130,6 +134,7 @@ jobs:
           container_id:    ${{ steps.ids.outputs.container_id }}
           artifact_path:   ${{ steps.download.outputs.artifact_path }}
           executable_path: ${{ matrix.executable_path }}
+          insecure_tls:    "true"
 
       - name: Restart container
         uses: BQN-UY/CI-CD/.github/actions/shared/portainer-restart-container@v2
@@ -138,6 +143,7 @@ jobs:
           portainer_token: ${{ secrets.PORTAINER_TOKEN }}
           endpoint_id:     ${{ steps.ids.outputs.endpoint_id }}
           container_id:    ${{ steps.ids.outputs.container_id }}
+          insecure_tls:    "true"
 
   # ---------------------------------------------------------------------------
   # Notify: resumen a Google Chat. Corre siempre (éxito o fallo).

@@ -26,9 +26,12 @@ inputs:
       (ej. /app/lib/acp-api.jar). El directorio debe existir en el container.
     required: true
   insecure_tls:
-    description: Si 'true' usa curl --insecure (self-signed cert). Default true por continuidad con v1.
+    description: >
+      Si 'true' usa curl --insecure (deshabilita verificación TLS). Default false
+      por seguridad. El caller debe setearlo a "true" explícitamente cuando el
+      Portainer destino use cert self-signed.
     required: false
-    default: "true"
+    default: "false"
 
 runs:
   using: composite
@@ -54,11 +57,16 @@ runs:
         DEST_DIR="${EXECUTABLE_PATH%/*}"    # /app/lib
         DEST_FILE="${EXECUTABLE_PATH##*/}"  # acp-api.jar
 
-        # Build tar with the file renamed to its destination name
+        # Build tar with the file renamed to its destination name.
+        # Both staging dir and tar live under the same per-job mktemp dir so
+        # parallel matrix jobs on the same runner cannot collide.
         TMPDIR=$(mktemp -d)
-        trap 'rm -rf "$TMPDIR" /tmp/_bqn_artifact_upload.tar' EXIT
-        cp "$ARTIFACT_PATH" "$TMPDIR/$DEST_FILE"
-        tar -cf /tmp/_bqn_artifact_upload.tar -C "$TMPDIR" "$DEST_FILE"
+        trap 'rm -rf "$TMPDIR"' EXIT
+        STAGING="$TMPDIR/staging"
+        TAR_PATH="$TMPDIR/upload.tar"
+        mkdir -p "$STAGING"
+        cp "$ARTIFACT_PATH" "$STAGING/$DEST_FILE"
+        tar -cf "$TAR_PATH" -C "$STAGING" "$DEST_FILE"
 
         CURL_OPTS=(-sS --connect-timeout 10 --max-time 300
           -H "X-API-KEY: ${PORTAINER_TOKEN}"
@@ -73,7 +81,7 @@ runs:
         echo "Copying $(basename "$ARTIFACT_PATH") -> ${EXECUTABLE_PATH} (container ${CONTAINER_ID:0:12})"
 
         HTTP_STATUS=$(curl "${CURL_OPTS[@]}" -X PUT \
-          --data-binary @/tmp/_bqn_artifact_upload.tar \
+          --data-binary "@${TAR_PATH}" \
           "${PORTAINER_URL}/api/endpoints/${ENDPOINT_ID}/docker/containers/${CONTAINER_ID}/archive?path=${DEST_DIR_ENC}")
 
         case "$HTTP_STATUS" in
