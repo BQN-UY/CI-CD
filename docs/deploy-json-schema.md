@@ -4,8 +4,8 @@ Config de deploy descentralizada de v2. Reemplaza al `sistemas.json` centralizad
 
 - **Schema JSON**: [`schemas/deploy.schema.json`](../schemas/deploy.schema.json)
 - **Decisión y motivación**: ver `docs/v2-hito2-deploy-spec.md` §4.9 y §4.10
-- **Consumido por**: reusable workflow `scala-api-deploy.yml` (pendiente — Hito 3)
-- **Inventario global**: generado semanalmente por workflow cron en CI-CD repo (Hito 3)
+- **Consumido por**: reusable workflow `scala-api-deploy.yml` (incluido en este PR / Hito 3 en curso, [#89](https://github.com/BQN-UY/CI-CD/pull/89))
+- **Inventario global**: generado semanalmente por workflow cron en CI-CD repo (`scripts/build-inventory.py` — alineación con este schema en track separado)
 
 ---
 
@@ -123,7 +123,7 @@ Declara el stack + forma del artefacto. Alinea con la taxonomía `templates/<sta
 | Campo | Descripción |
 |---|---|
 | `environments.<env>` | Uno de `testing`, `staging`, `production`. Solo se definen los ambientes en los que la app deploya. |
-| `installations[].name` | Identificador de la instalación dentro del ambiente. Único. Se usa como valor en el dropdown de deploy manual (`workflow_dispatch`). Convención: `<sistema>_<variante>`. |
+| `installations[].name` | Identificador de la instalación dentro del ambiente. Único. Se ingresa como string en el input `installations` del `workflow_dispatch` (uno o varios separados por coma — el workflow valida que cada nombre exista). Convención: `<sistema>_<variante>`. |
 | `portainer_endpoint` | Nombre del endpoint Portainer (PublicURL, no ID). Se resuelve a ID vía `GET /api/endpoints?search=<name>` al momento del deploy. |
 | `portainer_stack` | Nombre del compose project — label `com.docker.compose.project` del container. Junto con `portainer_service` + `portainer_replica` resuelve el container ID por labels (C2 — robusto frente a renames del container). |
 | `portainer_service` | Nombre del servicio compose — label `com.docker.compose.service` del container. |

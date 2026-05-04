@@ -84,7 +84,11 @@ runs:
         fi
         echo "Resolved endpoint '$ENDPOINT_NAME' -> id=$ENDPOINT_ID"
 
-        # 2) Resolve container ID — by compose labels (C2: stack + service + replica)
+        # 2) Resolve container ID — by compose labels (C2: stack + service + replica).
+        # Filtramos por status=running para evitar agarrar containers stopped/exited
+        # que pueden quedar tras un recreate (mismo set de labels). Si el container
+        # objetivo no está running, el deploy falla — comportamiento esperado:
+        # el state no es válido para copy + restart.
         FILTER=$(jq -cn \
           --arg stack   "$PORTAINER_STACK" \
           --arg service "$PORTAINER_SERVICE" \
@@ -93,7 +97,7 @@ runs:
             "com.docker.compose.project=\($stack)",
             "com.docker.compose.service=\($service)",
             "com.docker.compose.container-number=\($replica)"
-          ]}')
+          ], "status": ["running"]}')
         FILTER_ENC=$(jq -rn --arg f "$FILTER" '$f | @uri')
 
         CONTAINERS_JSON=$(curl "${CURL_OPTS[@]}" \
@@ -101,11 +105,11 @@ runs:
 
         COUNT=$(echo "$CONTAINERS_JSON" | jq 'length')
         if [[ "$COUNT" == "0" ]]; then
-          echo "::error::No container found for stack='${PORTAINER_STACK}' service='${PORTAINER_SERVICE}' replica='${PORTAINER_REPLICA}' in endpoint '${ENDPOINT_NAME}'" >&2
+          echo "::error::No running container found for stack='${PORTAINER_STACK}' service='${PORTAINER_SERVICE}' replica='${PORTAINER_REPLICA}' in endpoint '${ENDPOINT_NAME}'. Container missing or stopped." >&2
           exit 1
         fi
         if [[ "$COUNT" -gt 1 ]]; then
-          echo "::warning::Multiple containers matched (count=$COUNT) — using first. Check portainer_replica in deploy.json." >&2
+          echo "::warning::Multiple running containers matched (count=$COUNT) — using first. Check portainer_replica in deploy.json." >&2
         fi
 
         CONTAINER_ID=$(echo "$CONTAINERS_JSON" | jq -r '.[0].Id // empty')

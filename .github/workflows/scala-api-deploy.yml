@@ -45,8 +45,10 @@ jobs:
     name: Plan (${{ inputs.environment }})
     runs-on: ubuntu-latest
     outputs:
-      matrix: ${{ steps.plan.outputs.matrix }}
-      count:  ${{ steps.plan.outputs.count }}
+      matrix:        ${{ steps.plan.outputs.matrix }}
+      count:         ${{ steps.plan.outputs.count }}
+      pending_count: ${{ steps.plan.outputs.pending_count }}
+      pending_names: ${{ steps.plan.outputs.pending_names }}
     steps:
       - uses: actions/checkout@v4
 
@@ -69,21 +71,46 @@ jobs:
             exit 1
           fi
 
+          PENDING_COUNT=0
+          PENDING_NAMES=""
+
           if [[ -z "$INSTALLATIONS" ]]; then
+            # Modo automático: instalaciones con auto_deploy=true se deployan;
+            # las que tienen auto_deploy=false se reportan como "manual pendiente".
             SELECTED=$(echo "$ENV_CONFIG" | jq '[.installations[] | select(.auto_deploy == true)]')
+            PENDING=$(echo "$ENV_CONFIG"  | jq '[.installations[] | select(.auto_deploy != true)]')
+            PENDING_COUNT=$(echo "$PENDING" | jq 'length')
+            PENDING_NAMES=$(echo "$PENDING" | jq -r '[.[].name] | join(", ")')
           else
+            # Modo manual: validar que TODOS los nombres pedidos existan en el env.
+            # Si hay nombres no encontrados → fail-loud (evita rollouts parciales
+            # que parezcan exitosos por typo del operador).
+            REQUESTED_LIST=$(echo "$INSTALLATIONS" | tr ',' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | grep -v '^$' | sort -u || true)
+            if [[ -z "$REQUESTED_LIST" ]]; then
+              echo "::error::Manual selection 'installations' is empty after trimming. Provide a comma-separated list of installation names." >&2
+              exit 1
+            fi
             SELECTED=$(echo "$ENV_CONFIG" | jq --arg csv "$INSTALLATIONS" \
-              '($csv | split(",") | map(gsub("^\\s+|\\s+$"; ""))) as $names
+              '($csv | split(",") | map(gsub("^\\s+|\\s+$"; "")) | map(select(. != ""))) as $names
                | [.installations[] | select(.name as $n | $names | index($n))]')
+            FOUND_LIST=$(echo "$SELECTED" | jq -r '.[].name' | sort -u)
+            MISSING=$(comm -23 <(echo "$REQUESTED_LIST") <(echo "$FOUND_LIST") | tr '\n' ',' | sed 's/,$//')
+            if [[ -n "$MISSING" ]]; then
+              VALID=$(echo "$ENV_CONFIG" | jq -r '[.installations[].name] | join(", ")')
+              echo "::error::Manual selection contains unknown installations for env '$ENVIRONMENT': $MISSING. Valid names: $VALID" >&2
+              exit 1
+            fi
           fi
 
           COUNT=$(echo "$SELECTED" | jq 'length')
-          if [[ "$COUNT" == "0" ]]; then
-            echo "::warning::No installations selected (auto_deploy empty or selection did not match)"
+          if [[ "$COUNT" == "0" && "$PENDING_COUNT" == "0" ]]; then
+            echo "::warning::Environment '$ENVIRONMENT' has no installations configured."
           fi
 
           echo "matrix=$(echo "$SELECTED" | jq -c '{include: .}')" >> "$GITHUB_OUTPUT"
-          echo "count=$COUNT"                                        >> "$GITHUB_OUTPUT"
+          echo "count=$COUNT"                                       >> "$GITHUB_OUTPUT"
+          echo "pending_count=$PENDING_COUNT"                       >> "$GITHUB_OUTPUT"
+          echo "pending_names=$PENDING_NAMES"                       >> "$GITHUB_OUTPUT"
 
   # ---------------------------------------------------------------------------
   # Deploy: una instancia por instalación (matriz paralela).
@@ -97,6 +124,12 @@ jobs:
     if: needs.plan.outputs.count != '0'
     runs-on: [self-hosted, bqn-deploy]
     environment: ${{ inputs.environment }}
+    # Concurrency por (environment, installation): evita race entre dos deploys
+    # disparados al mismo target (p.ej. push a develop + workflow_dispatch
+    # superpuestos). cancel-in-progress: false → encolan, no se pisan.
+    concurrency:
+      group: deploy-${{ inputs.environment }}-${{ matrix.name }}
+      cancel-in-progress: false
     permissions:
       contents:    read
       deployments: write
@@ -251,5 +284,33 @@ jobs:
           EMOJI=$([[ "$STATUS" == "success" ]] && echo "✅" || echo "❌")
           BODY=$(jq -nc \
             --arg t "${EMOJI} Deploy *${GITHUB_REPOSITORY##*/}* *${VERSION}* → *${ENVIRONMENT}* — *${STATUS}* (por ${ACTOR}) <${RUN_URL}|ver run>" \
+            '{text: $t}')
+          curl -sS -X POST -H "Content-Type: application/json" -d "$BODY" "$WEBHOOK" >/dev/null
+
+  # ---------------------------------------------------------------------------
+  # Notify-pending: avisa a operadores cuando hay instalaciones con
+  # auto_deploy=false que el workflow saltó (capability de v2 — evita que
+  # se pierda visibilidad de versiones que esperan deploy manual).
+  # ---------------------------------------------------------------------------
+  notify-pending:
+    name: Notify manual pending
+    needs: plan
+    if: needs.plan.outputs.pending_count != '0'
+    runs-on: ubuntu-latest
+    env:
+      WEBHOOK: ${{ inputs.environment == 'production' && secrets.GCHAT_WEBHOOK_PRODUCTION || secrets.GCHAT_WEBHOOK_TESTING_STAGING }}
+    steps:
+      - name: Send "manual pending" message to Google Chat
+        if: env.WEBHOOK != ''
+        env:
+          ENVIRONMENT:   ${{ inputs.environment }}
+          VERSION:       ${{ inputs.version }}
+          PENDING_NAMES: ${{ needs.plan.outputs.pending_names }}
+          DISPATCH_URL:  ${{ github.server_url }}/${{ github.repository }}/actions/workflows/deploy.yml
+        shell: bash
+        run: |
+          set -euo pipefail
+          BODY=$(jq -nc \
+            --arg t "⏸️ *${GITHUB_REPOSITORY##*/}* *${VERSION}* → *${ENVIRONMENT}* — *manual pendiente* para: ${PENDING_NAMES}. <${DISPATCH_URL}|disparar workflow>" \
             '{text: $t}')
           curl -sS -X POST -H "Content-Type: application/json" -d "$BODY" "$WEBHOOK" >/dev/null
