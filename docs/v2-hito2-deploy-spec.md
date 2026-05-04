@@ -367,13 +367,13 @@ Estos cambios son **prerrequisito** del Hito 3 — sin ellos, los apps no tienen
 
 ## 8. Visión end-to-end del deploy
 
-> Versionado y publicación de artefactos: §2.2. Esta sección cubre **solo la interacción de componentes durante el deploy**.
+> Versionado: §2.2. Publicación de artefactos: §2.1. Esta sección cubre **solo la interacción de componentes durante el deploy**.
 
 ### 8.1 Componentes
 
 ```mermaid
 flowchart LR
-    Trigger["Trigger<br/>(push o make-release)"] --> Workflow["Deploy workflow<br/>(GH Actions)"]
+    Trigger["Trigger<br/>(release.published / workflow_dispatch)"] --> Workflow["Deploy workflow<br/>(GH Actions)"]
     Workflow --> Runner["Runner self-hosted bqn-deploy<br/>(en docker-soporte)"]
     Runner -->|gh release download| Release[("GH Release del repo<br/>+ artifact")]
     Runner -->|Portainer API| Portainer["Portainer<br/>(docker-testing / docker-banquinet)"]
@@ -386,29 +386,30 @@ flowchart LR
 
 ```mermaid
 sequenceDiagram
-    actor T as Trigger (push / Soporte)
+    actor T as Trigger
     participant GH as GitHub Actions
     participant R as Runner (bqn-deploy)
+    participant Rel as GitHub Releases
     participant P as Portainer API
-    participant C as Container
+    participant Side as GH Deployments + GChat
 
-    T->>GH: dispara el deploy workflow
+    T->>GH: release.published / workflow_dispatch
     alt environment = production
         GH-->>GH: pausa hasta approval (GH Environment)
     end
     GH->>R: ejecuta el job
-    R->>GH: descarga artifact del tag
+    R->>Rel: descarga artifact del tag
     R->>P: identifica container (stack + service + replica)
     R->>P: stop container
     R->>P: copia artifact a executable_path
     R->>P: start container
-    R-->>GH: registra Deployment + notifica GChat
+    R-->>Side: registra Deployment + notifica
 ```
 
 ### 8.3 Notas operativas
 
-- **Runner único** `bqn-deploy` corre en `docker-soporte` y habla con Portainer por red interna (decisión Opción C — §C1).
-- **Approval prod**: GH Environments suspende el job hasta que un approver del pool lo apruebe (§D5). Testing y staging son auto-deploy.
+- **Runner único** `bqn-deploy` corre en `docker-soporte` y habla con Portainer por red interna (ver [#107](https://github.com/BQN-UY/CI-CD/issues/107) y CI-CD#98).
+- **Approval**: para `production`, GH Environments suspende el job hasta que un approver del pool lo apruebe (§D5). Para testing/staging no hay approval; el disparo automático depende del flag `auto_deploy` por instalación (§D7) — sin él, la publicación notifica con link al `workflow_dispatch` y queda manual.
 - **Artifact source**: GH Release del propio repo (snapshot, rc o final). No hay Nexus en este flujo.
 
 ---
