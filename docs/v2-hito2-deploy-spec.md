@@ -365,42 +365,51 @@ Estos cambios son **prerrequisito** del Hito 3 — sin ellos, los apps no tienen
 
 ---
 
-## 8. Visión end-to-end (Hito 3)
+## 8. Visión end-to-end del deploy
 
-Cómo se ve el flujo completo cuando todo esté implementado:
+> Versionado y publicación de artefactos: §2.2. Esta sección cubre **solo la interacción de componentes durante el deploy**.
+
+### 8.1 Componentes
 
 ```mermaid
 flowchart LR
-    subgraph dev["Push develop"]
-        D_push["Dev pushea a develop"] --> D_publish["scala-api-publish.yml"]
-        D_publish --> D_compute["Calcular target<br/>= last_final + bump<br/>+ next NNN"]
-        D_compute --> D_build["Build JAR"]
-        D_build --> D_release["GH pre-release<br/>v1.3.0-snapshot.NNN"]
-    end
-    subgraph rel["Push release/hotfix"]
-        R_push["Dev pushea a release/v1.3.0"] --> R_publish["scala-api-publish.yml"]
-        R_publish --> R_compute["Calcular siguiente rc.NNN"]
-        R_compute --> R_build["Build JAR"]
-        R_build --> R_release["GH pre-release<br/>v1.3.0-rc.NNN"]
-    end
-    subgraph mr["Make release manual"]
-        M_disp["Dev dispatches make-release"] --> M_tag["Tag vX.Y.Z + GH release final"]
-        M_tag --> M_back["Back-merge a develop"]
-        M_back --> M_reset["Reset .github/next-bump = minor"]
-    end
-    subgraph dep["Deploy GA-native (cualquiera de los anteriores)"]
-        D_release --> Dp_trigger["Trigger deploy a testing"]
-        R_release --> Dp_trigger2["Trigger deploy a staging"]
-        M_tag --> Dp_trigger3["Manual: Soporte deploy a production"]
-        Dp_trigger --> Dp_runner["Self-hosted runner GA"]
-        Dp_trigger2 --> Dp_runner
-        Dp_trigger3 --> Dp_runner
-        Dp_runner --> Dp_dl["gh release download <tag>"]
-        Dp_dl --> Dp_portainer["Portainer API:<br/>stop / cp / start"]
-        Dp_runner --> Dp_record["GH Deployments API:<br/>record env + ref + status"]
-        Dp_runner --> Dp_chat["Google Chat:<br/>notificar"]
-    end
+    Trigger["Trigger<br/>(push o make-release)"] --> Workflow["Deploy workflow<br/>(GH Actions)"]
+    Workflow --> Runner["Runner self-hosted bqn-deploy<br/>(en docker-soporte)"]
+    Runner -->|gh release download| Release[("GH Release del repo<br/>+ artifact")]
+    Runner -->|Portainer API| Portainer["Portainer<br/>(docker-testing / docker-banquinet)"]
+    Portainer --> Container["Container del servicio"]
+    Runner -.->|notifica| Chat["Google Chat"]
+    Runner -.->|registra| Deployments["GH Deployments API"]
 ```
+
+### 8.2 Secuencia de un deploy
+
+```mermaid
+sequenceDiagram
+    actor T as Trigger (push / Soporte)
+    participant GH as GitHub Actions
+    participant R as Runner (bqn-deploy)
+    participant P as Portainer API
+    participant C as Container
+
+    T->>GH: dispara el deploy workflow
+    alt environment = production
+        GH-->>GH: pausa hasta approval (GH Environment)
+    end
+    GH->>R: ejecuta el job
+    R->>GH: descarga artifact del tag
+    R->>P: identifica container (stack + service + replica)
+    R->>P: stop container
+    R->>P: copia artifact a executable_path
+    R->>P: start container
+    R-->>GH: registra Deployment + notifica GChat
+```
+
+### 8.3 Notas operativas
+
+- **Runner único** `bqn-deploy` corre en `docker-soporte` y habla con Portainer por red interna (decisión Opción C — §C1).
+- **Approval prod**: GH Environments suspende el job hasta que un approver del pool lo apruebe (§D5). Testing y staging son auto-deploy.
+- **Artifact source**: GH Release del propio repo (snapshot, rc o final). No hay Nexus en este flujo.
 
 ---
 
