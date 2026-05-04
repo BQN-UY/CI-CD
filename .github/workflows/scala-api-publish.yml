@@ -91,11 +91,13 @@ jobs:
             exit 1
           fi
 
-          # Calcular próximo NNN
+          # Calcular próximo NNN.
+          # `10#` fuerza interpretación decimal — sin él, valores con leading zero
+          # (ej. "008") se interpretan como octal y `8`/`9` rompen la aritmética.
           LAST_N=$(git tag --list "${PREFIX}.*" \
                     | sed -n "s|^${PREFIX}\.\([0-9]\+\)\$|\1|p" \
                     | sort -n | tail -1 || true)
-          NEXT=$(( ${LAST_N:-0} + 1 ))
+          NEXT=$(( 10#${LAST_N:-0} + 1 ))
           NNN=$(printf "%03d" "$NEXT")
           TAG="${PREFIX}.${NNN}"
 
