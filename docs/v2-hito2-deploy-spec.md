@@ -373,7 +373,7 @@ Estos cambios son **prerrequisito** del Hito 3 — sin ellos, los apps no tienen
 
 ```mermaid
 flowchart LR
-    Trigger["Trigger<br/>(release.published / workflow_dispatch)"] --> Workflow["Deploy workflow<br/>(GH Actions)"]
+    Trigger["Trigger"] --> Workflow["Deploy workflow<br/>(GH Actions)"]
     Workflow --> Runner["Runner self-hosted bqn-deploy<br/>(en docker-soporte)"]
     Runner -->|gh release download| Release[("GH Release del repo<br/>+ artifact")]
     Runner -->|Portainer API| Portainer["Portainer<br/>(docker-testing / docker-banquinet)"]
@@ -393,10 +393,7 @@ sequenceDiagram
     participant P as Portainer API
     participant Side as GH Deployments + GChat
 
-    T->>GH: release.published / workflow_dispatch
-    alt environment = production
-        GH-->>GH: pausa hasta approval (GH Environment)
-    end
+    T->>GH: dispara el deploy workflow
     GH->>R: ejecuta el job
     R->>Rel: descarga artifact del tag
     R->>P: identifica container (stack + service + replica)
@@ -407,8 +404,8 @@ sequenceDiagram
 
 ### 8.3 Notas operativas
 
-- **Runner único** `bqn-deploy` corre en `docker-soporte` y habla con Portainer por red interna (ver [#107](https://github.com/BQN-UY/CI-CD/issues/107) y CI-CD#98).
-- **Approval**: para `production`, GH Environments suspende el job hasta que un approver del pool lo apruebe (§D5). Para testing/staging no hay approval; el disparo automático depende del flag `auto_deploy` por instalación (§D7) — sin él, la publicación notifica con link al `workflow_dispatch` y queda manual.
+- **Trigger**: para testing y staging, el deploy se dispara con `release.published` cuando la instalación tiene `auto_deploy: true` (§D7); sin ese flag, la publicación notifica con link al `workflow_dispatch` y queda manual. Para production, el deploy es **siempre manual** via `workflow_dispatch` y el job se suspende dentro del GH Environment hasta que un approver del pool lo apruebe (§D5).
+- **Runner**: un único runner self-hosted (`bqn-deploy`) corre en `docker-soporte` y habla con Portainer por red interna. Arquitectura propuesta en §C1; instalación trackeada en [#107](https://github.com/BQN-UY/CI-CD/issues/107).
 - **Artifact source**: GH Release del propio repo (snapshot, rc o final). No hay Nexus en este flujo.
 
 ---
