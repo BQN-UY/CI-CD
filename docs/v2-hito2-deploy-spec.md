@@ -2,7 +2,7 @@
 
 > **Estado:** decisiones de diseño cerradas (D1–D7) y consultas con Soporte Operativo cerradas (C1, C2) — todas conformadas en [CI-CD#98](https://github.com/BQN-UY/CI-CD/issues/98) (2026-04-16). Ver §4 y §5. · Tracking: `docs/v2-sin-jenkins-roadmap.md` Hito 2.
 
-Documento canónico del diseño del deploy GA-native que reemplaza a Jenkins en v2. Captura: principios, modelo de artefactos, convención de versionado, requisitos heredados de v1, decisiones tomadas y decisiones abiertas.
+Documento canónico del diseño del deploy GA-native que reemplaza a Jenkins en v2. Captura: principios, modelo de artefactos, convención de versionado, requisitos heredados de v1 y decisiones de diseño (D1–D7 + C1–C2).
 
 > **Documento complementario:** [`docs/v2-deploy-design-proposal-soporte.md`](./v2-deploy-design-proposal-soporte.md) contiene el razonamiento completo de cada decisión, el análisis de opciones descartadas, el mapeo a controles ISO 27001 y la matriz para visto/firma de Soporte. Este spec captura el **qué** final; el proposal captura el **por qué** y es el doc de revisión con Bruno/Jonathan/Elías.
 
@@ -340,7 +340,7 @@ El spec se considera completo cuando responde:
 - [x] (C1) Arquitectura del runner — Opción C confirmada (CI-CD#98)
 - [x] (C2) Identificación de containers — modelo `stack + service + replica` confirmado (CI-CD#98)
 - [x] Conformidad de Soporte Operativo sobre `v2-deploy-design-proposal-soporte.md` (CI-CD#98 — reemplaza la firma formal separada)
-- [ ] Diseño del composite `shared/deploy-*` y workflow `scala-api-deploy.yml` (Hito 3 — en curso, [PR #89](https://github.com/BQN-UY/CI-CD/pull/89))
+- [ ] Diseño de los composites `shared/portainer-*` (resolve-ids, copy-artifact) y workflow `scala-api-deploy.yml` (Hito 3 — en curso, [PR #89](https://github.com/BQN-UY/CI-CD/pull/89))
 - [ ] Criterio de migración: cómo un repo v2 publish-only adopta el deploy GA-native (PR mecánico, Hito 3)
 
 Hito 3 en curso: composites + reusable workflow en [PR #89](https://github.com/BQN-UY/CI-CD/pull/89); piloto operativo trackeado en [#109](https://github.com/BQN-UY/CI-CD/issues/109).
@@ -411,7 +411,7 @@ sequenceDiagram
 ## 9. Próximos pasos
 
 1. Cerrar [PR #89](https://github.com/BQN-UY/CI-CD/pull/89) — composites + reusable workflow `scala-api-deploy.yml`.
-2. Avanzar el piloto `acp-api` según [#109](https://github.com/BQN-UY/CI-CD/issues/109) hasta cumplir los criterios §5.4: ≥3 deploys testing, ≥1 staging, ≥1 rollback, conformidad de Soporte sobre operabilidad autónoma.
+2. Avanzar el piloto `acp-api` según [#109](https://github.com/BQN-UY/CI-CD/issues/109) hasta cumplir los criterios de §D4: ≥3 deploys testing, ≥1 staging, ≥1 rollback, conformidad de Soporte sobre operabilidad autónoma.
 3. Cerrar el segundo piloto (`colectivizacion`, §D4) y arrancar el rollout por olas.
 4. Durante el rollout, Jenkins v1 permanece operativo como fallback.
 
