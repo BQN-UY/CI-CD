@@ -400,9 +400,8 @@ sequenceDiagram
     GH->>R: ejecuta el job
     R->>Rel: descarga artifact del tag
     R->>P: identifica container (stack + service + replica)
-    R->>P: stop container
     R->>P: copia artifact a executable_path
-    R->>P: start container
+    R->>P: restart container (forzado, §D1)
     R-->>Side: registra Deployment + notifica
 ```
 
