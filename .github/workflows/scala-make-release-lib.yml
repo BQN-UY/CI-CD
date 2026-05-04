@@ -28,17 +28,33 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          fetch-depth: 2
+          fetch-depth: 0
 
-      - name: Get scala changed files
+      - name: Get last release tag SHA
+        id: last-tag
+        run: |
+          last_tag=$(git describe --tags --abbrev=0 --match='v*' 2>/dev/null || true)
+          if [ -z "$last_tag" ]; then
+            echo "No release tag found; using root commit as base."
+            echo "sha=$(git rev-list --max-parents=0 HEAD | head -1)" >> "$GITHUB_OUTPUT"
+          else
+            echo "Comparing against last release tag: $last_tag"
+            echo "sha=$(git rev-list -n 1 "$last_tag")" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Get scala changed files since last release
         id: changed-scala-files
         uses: tj-actions/changed-files@v47
         with:
+          base_sha: ${{ steps.last-tag.outputs.sha }}
           dir_names: "true"
           files: |
             *.sbt
             **/*.sbt
-            **/*.scala     
+            **/*.scala
+          files_ignore: |
+            version.sbt
+            **/version.sbt
 
   make-release:
     needs: check-changes
