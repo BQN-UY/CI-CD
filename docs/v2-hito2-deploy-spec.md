@@ -1,6 +1,6 @@
 # Hito 2 — Spec del deploy GA-native
 
-> **Estado:** decisiones de diseño cerradas internamente (D1–D7); dos consultas abiertas con Soporte Operativo (C1, C2). Ver §4 y §5. · Tracking: `docs/v2-sin-jenkins-roadmap.md` Hito 2.
+> **Estado:** decisiones de diseño cerradas (D1–D7) y consultas con Soporte Operativo cerradas (C1, C2) — todas conformadas en [CI-CD#98](https://github.com/BQN-UY/CI-CD/issues/98) (2026-04-16). Ver §4 y §5. · Tracking: `docs/v2-sin-jenkins-roadmap.md` Hito 2.
 
 Documento canónico del diseño del deploy GA-native que reemplaza a Jenkins en v2. Captura: principios, modelo de artefactos, convención de versionado, requisitos heredados de v1, decisiones tomadas y decisiones abiertas.
 
@@ -287,27 +287,27 @@ Cuando se publica un snapshot/RC y la instalación tiene `auto_deploy: false`, e
 
 ---
 
-## 5. Decisiones abiertas (consultas activas con Soporte)
+## 5. Decisiones cerradas tras consulta con Soporte
 
-Dos consultas ya formuladas al canal de Soporte. Las respuestas condicionan parte del diseño.
+Dos consultas formuladas al canal de Soporte; ambas cerradas como conformes en [CI-CD#98](https://github.com/BQN-UY/CI-CD/issues/98) (2026-04-16). Quedan registradas acá para trazabilidad de la decisión.
 
-### C1 · Arquitectura del runner — viabilidad de Opción C
+### C1 · Arquitectura del runner — Opción C confirmada
 
 Tres opciones evaluadas:
 
 | Opción | Modelo | Resultado |
 |---|---|---|
-| A | 1 runner único + SSH/SCP a hosts | Descartada en propuesta (credenciales SSH nuevas, SPOF). Fallback si C no viable. |
-| B | 1 runner por host | Descartada en propuesta (provisioning × N, superficie de credenciales distribuida). |
-| **C** | 1 runner único + Docker API vía Portainer (escritura con `PUT /containers/{id}/archive`) | **Propuesta**. Runner 100% network-only en `docker-soporte`; reusa el token Portainer; sin credenciales SSH nuevas; sin provisioning por host. |
+| A | 1 runner único + SSH/SCP a hosts | Descartada (credenciales SSH nuevas, SPOF). Fallback si C dejara de ser viable. |
+| B | 1 runner por host | Descartada (provisioning × N, superficie de credenciales distribuida). |
+| **C** | 1 runner único + Docker API vía Portainer (escritura con `PUT /containers/{id}/archive`) | **Decidida**. Runner 100% network-only en `docker-soporte`; reusa el token Portainer; sin credenciales SSH nuevas; sin provisioning por host. |
 
-**Pregunta en curso:** para todos los server-apps actuales, ¿el `executable_path` está bind-mounted dentro del container? Si sí → C viable. Si hay casos de paths no bind-mounted (ej `/opt/webapps` centralizado) → A para esos casos puntuales.
+Instalación operativa del runner trackeada en [#107](https://github.com/BQN-UY/CI-CD/issues/107).
 
-### C2 · Identificación de containers en `deploy.json`
+### C2 · Identificación de containers en `deploy.json` — modelo confirmado
 
-Propuesta: identificar por `stack + service + replicas[]` (labels de compose: `com.docker.compose.project`/`.service`), no por nombre de container (que en la mayoría de casos es autogenerado `<stack>-<servicio>-<replica>`).
+Identificación por `stack + service + replicas[]` (labels de compose: `com.docker.compose.project`/`.service`), no por nombre de container (que en la mayoría de casos es autogenerado `<stack>-<servicio>-<replica>`).
 
-Schema propuesto:
+Schema:
 
 ```yaml
 installations:
@@ -321,9 +321,7 @@ installations:
     auto_deploy: true
 ```
 
-**Preguntas en curso:**
-1. ¿`tcp_server` es hoy el único stack con réplicas múltiples? ¿Se esperan más en corto/mediano plazo?
-2. ¿Hay containers sin stack de compose (standalone, creados manual) que requerirían identificación por nombre explícito?
+Containers standalone (sin stack de compose) quedan como caso futuro si aparecen — no hay casos identificados en los repos del scope inicial. Schema canónico vive en `schemas/deploy.schema.json` (parte del [PR #89](https://github.com/BQN-UY/CI-CD/pull/89)).
 
 ---
 
@@ -339,13 +337,13 @@ El spec se considera completo cuando responde:
 - [x] (D5) Approvers prod + fusible SoD
 - [x] (D6) Paths intra-container
 - [x] (D7) Auto-deploy opt-in per-instalación
-- [ ] (C1) Arquitectura del runner — viabilidad de Opción C (consulta abierta con Soporte)
-- [ ] (C2) Identificación de containers — réplicas y casos standalone (consulta abierta con Soporte)
-- [ ] Conformidad firmada de Soporte Operativo sobre `v2-deploy-design-proposal-soporte.md`
-- [ ] Diseño del composite `shared/deploy-*` y workflow `scala-api-deploy.yml` (Hito 3)
+- [x] (C1) Arquitectura del runner — Opción C confirmada (CI-CD#98)
+- [x] (C2) Identificación de containers — modelo `stack + service + replica` confirmado (CI-CD#98)
+- [x] Conformidad de Soporte Operativo sobre `v2-deploy-design-proposal-soporte.md` (CI-CD#98 — reemplaza la firma formal separada)
+- [ ] Diseño del composite `shared/deploy-*` y workflow `scala-api-deploy.yml` (Hito 3 — en curso, [PR #89](https://github.com/BQN-UY/CI-CD/pull/89))
 - [ ] Criterio de migración: cómo un repo v2 publish-only adopta el deploy GA-native (PR mecánico, Hito 3)
 
-Cuando C1 + C2 + conformidad de Soporte estén resueltas → arranca Hito 3 (implementación).
+Hito 3 en curso: composites + reusable workflow en [PR #89](https://github.com/BQN-UY/CI-CD/pull/89); piloto operativo trackeado en [#109](https://github.com/BQN-UY/CI-CD/issues/109).
 
 ---
 
@@ -405,17 +403,17 @@ sequenceDiagram
 ### 8.3 Notas operativas
 
 - **Trigger**: para testing y staging, el deploy se dispara con `release.published` cuando la instalación tiene `auto_deploy: true` (§D7); sin ese flag, la publicación notifica con link al `workflow_dispatch` y queda manual. Para production, el deploy es **siempre manual** via `workflow_dispatch` y el job se suspende dentro del GH Environment hasta que un approver del pool lo apruebe (§D5).
-- **Runner**: un único runner self-hosted (`bqn-deploy`) corre en `docker-soporte` y habla con Portainer por red interna. Arquitectura propuesta en §C1; instalación trackeada en [#107](https://github.com/BQN-UY/CI-CD/issues/107).
+- **Runner**: un único runner self-hosted (`bqn-deploy`) corre en `docker-soporte` y habla con Portainer por red interna. Arquitectura definida en §C1; instalación trackeada en [#107](https://github.com/BQN-UY/CI-CD/issues/107).
 - **Artifact source**: GH Release del propio repo (snapshot, rc o final). No hay Nexus en este flujo.
 
 ---
 
 ## 9. Próximos pasos
 
-1. Compartir [`v2-deploy-design-proposal-soporte.md`](./v2-deploy-design-proposal-soporte.md) con Bruno, Jonathan y Elías vía Drive para obtener visto/firma sobre D1–D7 + respuestas a C1/C2.
-2. Cuando lleguen las respuestas de C1 (runner/Opción C) y C2 (identificación de containers) → consolidar en §5 de este spec y en el proposal.
-3. Firmado el proposal → arranca Hito 3 (implementación de composites + reusable workflows).
-4. Durante Hito 3, Jenkins v1 permanece operativo como fallback hasta completar los dos pilotos + rollout por olas.
+1. Cerrar [PR #89](https://github.com/BQN-UY/CI-CD/pull/89) — composites + reusable workflow `scala-api-deploy.yml`.
+2. Avanzar el piloto `acp-api` según [#109](https://github.com/BQN-UY/CI-CD/issues/109) hasta cumplir los criterios §5.4: ≥3 deploys testing, ≥1 staging, ≥1 rollback, conformidad de Soporte sobre operabilidad autónoma.
+3. Cerrar el segundo piloto (`colectivizacion`, §D4) y arrancar el rollout por olas.
+4. Durante el rollout, Jenkins v1 permanece operativo como fallback.
 
 ---
 
