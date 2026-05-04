@@ -1,6 +1,6 @@
 # Hito 2 — Spec del deploy GA-native
 
-> **Estado:** decisiones de diseño cerradas (D1–D7) y consultas con Soporte Operativo cerradas (C1, C2) — todas conformadas en [CI-CD#98](https://github.com/BQN-UY/CI-CD/issues/98) (2026-04-16). Ver §4 y §5. · Tracking: `docs/v2-sin-jenkins-roadmap.md` Hito 2.
+> **Estado:** decisiones de diseño cerradas (D1–D7) y consultas con Soporte Operativo cerradas (C1, C2) — todas conformadas en [CI-CD#98](https://github.com/BQN-UY/CI-CD/issues/98) (2026-04-16). Ver §4 y §5. · Tracking operativo: [#109](https://github.com/BQN-UY/CI-CD/issues/109) (piloto) y [`BQN-UY/banquinet#3`](https://github.com/BQN-UY/banquinet/issues/3) (cross-repo).
 
 Documento canónico del diseño del deploy GA-native que reemplaza a Jenkins en v2. Captura: principios, modelo de artefactos, convención de versionado, requisitos heredados de v1 y decisiones de diseño (D1–D7 + C1–C2).
 
@@ -276,7 +276,7 @@ testing:
 **Equipo IDS Development (Santi, Nacho, Jose) no entra al pool.** Regla explícita, no accidente. Su participación en el proceso termina en merge a `main` / push a `develop`; el CI reacciona automáticamente.
 
 ### D6 · Paths intra-container en `deploy.json`
-`executable_path` es el path **dentro del container**, no en el host. El workflow escribe vía `PUT /containers/{id}/archive` a través del proxy Docker API de Portainer (sujeto a confirmación C1 — Opción C del runner).
+`executable_path` es el path **dentro del container**, no en el host. El workflow escribe vía `PUT /containers/{id}/archive` a través del proxy Docker API de Portainer (modelo Opción C de §C1).
 
 Esto desacopla totalmente al CI/CD del layout del host. Cambiar un bind mount en compose no rompe el deploy. El dev escribe el path "que la app ve", no el path físico.
 
@@ -374,8 +374,8 @@ flowchart LR
     Trigger["Trigger"] --> Workflow["Deploy workflow<br/>(GH Actions)"]
     Workflow --> Runner["Runner self-hosted bqn-deploy<br/>(en docker-soporte)"]
     Runner -->|gh release download| Release[("GH Release del repo<br/>+ artifact")]
-    Runner -->|Portainer API| Portainer["Portainer<br/>(docker-testing / docker-banquinet)"]
-    Portainer --> Container["Container del servicio"]
+    Runner -->|Portainer API| Portainer["Portainer<br/>(en docker-soporte:9443)"]
+    Portainer --> Container["Container del servicio<br/>(en docker-testing / docker-banquinet)"]
     Runner -.->|notifica| Chat["Google Chat"]
     Runner -.->|registra| Deployments["GH Deployments API"]
 ```
