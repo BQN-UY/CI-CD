@@ -5,7 +5,10 @@ Genera dos artefactos a partir del scan de repos de la org:
   docs/inventory.md (humano):
     1. Estado de migración v2 por repo (✅/🟡/🔴/⚪)
     2. Inventario agregado de deploys (desde cada .github/deploy.json)
-    3. Validación cruzada (colisiones, violaciones de schema)
+    3. Validación cruzada — colisiones de la cuádrupla
+       (portainer_endpoint, portainer_stack, portainer_service, portainer_replica)
+       y violaciones de schema (cada deploy.json validado contra
+       schemas/deploy.schema.json)
     4. Grafo de libs internas (publishers + consumers)
 
   config/lib-graph.json (máquina, consumido por scala-lib-make-release):
@@ -19,7 +22,7 @@ Clasificación de migración (spec §4.11):
   ⚪ N/A              — repo sin workflows de deploy
 
 Requiere: env vars GH_TOKEN (PAT con repo:read sobre la org) y ORG (default BQN-UY).
-Usa `gh api` para todas las llamadas a GitHub.
+Dependencia: jsonschema (Draft 2020-12). Usa `gh api` para todas las llamadas a GitHub.
 """
 from __future__ import annotations
 
@@ -33,10 +36,21 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
+from jsonschema import Draft202012Validator
+
 ORG = os.environ.get("ORG", "BQN-UY")
 OUTPUT = Path(os.environ.get("OUTPUT", "docs/inventory.md"))
 GRAPH_OUTPUT = Path(os.environ.get("GRAPH_OUTPUT", "config/lib-graph.json"))
-SCHEMA_REL_PATH = "schemas/deploy.schema.json"
+SCHEMA_PATH = Path(__file__).resolve().parent.parent / "schemas/deploy.schema.json"
+
+
+def load_schema_validator() -> Draft202012Validator:
+    schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
+    Draft202012Validator.check_schema(schema)
+    return Draft202012Validator(schema)
+
+
+SCHEMA_VALIDATOR: Draft202012Validator = load_schema_validator()
 
 # Orgs Maven consideradas internas para el grafo de libs.
 # Configurable via env INTERNAL_GROUPS (CSV), default cubre los dos en uso.
@@ -88,6 +102,7 @@ class RepoState:
     state: str = "unknown"  # v2_full | v2_publish | v1_legacy | na
     app_type: str | None = None
     deploy_json: dict | None = None
+    schema_errors: list[str] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
     # Grafo de libs internas (poblado al parsear build.sbt; None si no es Scala)
     publishes: tuple[str, str] | None = None  # (groupId, artifactId) si publica como lib interna
@@ -170,6 +185,11 @@ def classify(org: str, repo: str) -> RepoState:
             state.app_type = state.deploy_json.get("application_type")
         except json.JSONDecodeError:
             state.notes.append("deploy.json no parsea como JSON")
+
+    if state.deploy_json is not None:
+        for err in sorted(SCHEMA_VALIDATOR.iter_errors(state.deploy_json), key=lambda e: list(e.path)):
+            location = ".".join(str(p) for p in err.path) or "(root)"
+            state.schema_errors.append(f"`{location}`: {err.message}")
 
     workflows = list_workflow_files(org, repo)
     uses_v2 = False
@@ -270,8 +290,8 @@ def render(states: list[RepoState], lib_graph: dict) -> str:
     # Sección 2: inventario de deploys
     lines.append("## 2. Inventario de deploys")
     lines.append("")
-    lines.append("| Repo | Tipo | Ambiente | Instalación | Endpoint | Container | Path | Ext | Auto |")
-    lines.append("|---|---|---|---|---|---|---|---|---|")
+    lines.append("| Repo | Tipo | Ambiente | Instalación | Endpoint | Stack | Service | Replica | Executable path | Auto |")
+    lines.append("|---|---|---|---|---|---|---|---|---|---|")
     deploy_rows: list[tuple] = []
     for s in states:
         if not s.deploy_json:
@@ -279,34 +299,42 @@ def render(states: list[RepoState], lib_graph: dict) -> str:
         envs = s.deploy_json.get("environments", {}) or {}
         for env_name, env in envs.items():
             for inst in env.get("installations", []) or []:
-                artifact = inst.get("artifact", {}) or {}
                 auto = "sí" if inst.get("auto_deploy") else "—"
                 deploy_rows.append((
                     s.name, s.app_type or "", env_name, inst.get("name", ""),
                     inst.get("portainer_endpoint", ""),
-                    inst.get("portainer_container", ""),
-                    artifact.get("deploy_path", ""),
-                    artifact.get("extension", ""),
+                    inst.get("portainer_stack", ""),
+                    inst.get("portainer_service", ""),
+                    inst.get("portainer_replica", 1),
+                    inst.get("executable_path", ""),
                     auto,
                 ))
     for row in sorted(deploy_rows):
         lines.append("| " + " | ".join(str(c) for c in row) + " |")
     if not deploy_rows:
-        lines.append("| _(ningún repo migrado todavía)_ | | | | | | | | |")
+        lines.append("| _(ningún repo migrado todavía)_ | | | | | | | | | |")
     lines.append("")
 
     # Sección 3: validación cruzada
     lines.append("## 3. Validación cruzada")
     lines.append("")
     issues: list[str] = []
-    # Colisiones: mismo (endpoint, container_name) en distintos repos/ambientes.
-    by_endpoint_container: dict[tuple[str, str], list[str]] = {}
-    for repo, _type, env, inst, ep, cn, *_ in deploy_rows:
-        if ep and cn:
-            by_endpoint_container.setdefault((ep, cn), []).append(f"{repo}/{env}/{inst}")
-    for (ep, cn), users in by_endpoint_container.items():
+    # Colisiones: misma cuádrupla (endpoint, stack, service, replica) en distintos repos/ambientes.
+    by_target: dict[tuple[str, str, str, int], list[str]] = {}
+    for repo, _type, env, inst, ep, stack, service, replica, _path, _auto in deploy_rows:
+        if ep and stack and service:
+            by_target.setdefault((ep, stack, service, replica), []).append(f"{repo}/{env}/{inst}")
+    for (ep, stack, service, replica), users in by_target.items():
         if len(users) > 1:
-            issues.append(f"- **Colisión** en `{ep}` / `{cn}`: {', '.join(users)}")
+            issues.append(
+                f"- **Colisión** en `{ep}` / `{stack}` / `{service}` / replica `{replica}`: {', '.join(users)}"
+            )
+
+    # Errores de schema: cada repo con violaciones se reporta individualmente.
+    for s in states:
+        if s.schema_errors:
+            errs = "\n  - ".join(s.schema_errors)
+            issues.append(f"- **Schema drift** en `{s.name}/.github/deploy.json`:\n  - {errs}")
 
     # Repos con v2 publish pero sin deploy.json: recordatorio.
     for s in states:
