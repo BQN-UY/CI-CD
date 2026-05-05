@@ -261,6 +261,8 @@ jobs:
   # Notify: resumen a Google Chat. Corre siempre (éxito o fallo).
   # Webhook elegido por environment: production → GCHAT_WEBHOOK_PRODUCTION,
   # resto → GCHAT_WEBHOOK_TESTING_STAGING. Org secrets de Fase 0 (CI-CD#95).
+  # Production hard-fails si el webhook está vacío para evitar mis-routing
+  # silencioso al canal de testing/staging (CI-CD#114).
   # ---------------------------------------------------------------------------
   notify:
     name: Notify
@@ -270,6 +272,18 @@ jobs:
     env:
       WEBHOOK: ${{ inputs.environment == 'production' && secrets.GCHAT_WEBHOOK_PRODUCTION || secrets.GCHAT_WEBHOOK_TESTING_STAGING }}
     steps:
+      - name: Hard-fail si production webhook está vacío
+        if: inputs.environment == 'production'
+        env:
+          WEBHOOK_PROD: ${{ secrets.GCHAT_WEBHOOK_PRODUCTION }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "$WEBHOOK_PROD" ]]; then
+            echo "::error::GCHAT_WEBHOOK_PRODUCTION está vacío o no seteado para un deploy a production. Se aborta para evitar routing silencioso al canal de testing/staging." >&2
+            exit 1
+          fi
+
       - name: Send Google Chat message
         if: env.WEBHOOK != ''
         env:
@@ -300,6 +314,18 @@ jobs:
     env:
       WEBHOOK: ${{ inputs.environment == 'production' && secrets.GCHAT_WEBHOOK_PRODUCTION || secrets.GCHAT_WEBHOOK_TESTING_STAGING }}
     steps:
+      - name: Hard-fail si production webhook está vacío
+        if: inputs.environment == 'production'
+        env:
+          WEBHOOK_PROD: ${{ secrets.GCHAT_WEBHOOK_PRODUCTION }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "$WEBHOOK_PROD" ]]; then
+            echo "::error::GCHAT_WEBHOOK_PRODUCTION está vacío o no seteado para un deploy a production. Se aborta para evitar routing silencioso al canal de testing/staging." >&2
+            exit 1
+          fi
+
       - name: Send "manual pending" message to Google Chat
         if: env.WEBHOOK != ''
         env:
