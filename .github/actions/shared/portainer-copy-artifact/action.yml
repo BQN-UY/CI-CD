@@ -60,13 +60,17 @@ runs:
         # Build tar with the file renamed to its destination name.
         # Both staging dir and tar live under the same per-job mktemp dir so
         # parallel matrix jobs on the same runner cannot collide.
+        # --owner=0 --group=0 --numeric-owner: el archivo entra al container con
+        # uid/gid 0 (root) en vez del uid/gid del runner self-hosted, que no
+        # tiene por qué existir dentro del container y puede romper permisos
+        # según el usuario con que corra la app. Mismo efecto que `cp` en v1.
         TMPDIR=$(mktemp -d)
         trap 'rm -rf "$TMPDIR"' EXIT
         STAGING="$TMPDIR/staging"
         TAR_PATH="$TMPDIR/upload.tar"
         mkdir -p "$STAGING"
         cp "$ARTIFACT_PATH" "$STAGING/$DEST_FILE"
-        tar -cf "$TAR_PATH" -C "$STAGING" "$DEST_FILE"
+        tar --owner=0 --group=0 --numeric-owner -cf "$TAR_PATH" -C "$STAGING" "$DEST_FILE"
 
         CURL_OPTS=(-sS --connect-timeout 10 --max-time 300
           -H "X-API-KEY: ${PORTAINER_TOKEN}"

@@ -139,6 +139,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Validar configuración org
+        env:
+          PORTAINER_URL: ${{ vars.PORTAINER_URL }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "$PORTAINER_URL" ]]; then
+            echo "::error::Org var PORTAINER_URL no está configurada (o no es visible para este repo). Es requerida por las composites Portainer. Ver runbook de Fase 0 (CI-CD#95)." >&2
+            exit 1
+          fi
+
       - name: Create deployment record
         id: deployment
         env:
