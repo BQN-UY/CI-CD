@@ -1,0 +1,111 @@
+name: Portainer — copy artifact into container
+description: >
+  Copia el artefacto al path de destino dentro del container vía Docker API
+  (PUT /containers/{id}/archive) a través del proxy Portainer. Opción C — no
+  requiere SSH ni acceso directo al FS del host. Compatible con paths bind-mounted.
+
+inputs:
+  portainer_url:
+    description: URL base de Portainer (sin trailing slash). Ej. https://docker-soporte:9443
+    required: true
+  portainer_token:
+    description: Token API de Portainer (X-API-KEY).
+    required: true
+  endpoint_id:
+    description: ID numérico del endpoint Portainer (obtenido con portainer-resolve-ids).
+    required: true
+  container_id:
+    description: ID del container Docker dentro del endpoint.
+    required: true
+  artifact_path:
+    description: Path local del artefacto descargado (ej. ./_artifact/myapp.jar).
+    required: true
+  executable_path:
+    description: >
+      Path completo dentro del container donde debe quedar el artefacto
+      (ej. /app/lib/acp-api.jar). El directorio debe existir en el container.
+    required: true
+  insecure_tls:
+    description: >
+      Si 'true' usa curl --insecure (deshabilita verificación TLS). Default false
+      por seguridad. El caller debe setearlo a "true" explícitamente cuando el
+      Portainer destino use cert self-signed.
+    required: false
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    - name: Copy artifact into container
+      shell: bash
+      env:
+        PORTAINER_URL:   ${{ inputs.portainer_url }}
+        PORTAINER_TOKEN: ${{ inputs.portainer_token }}
+        ENDPOINT_ID:     ${{ inputs.endpoint_id }}
+        CONTAINER_ID:    ${{ inputs.container_id }}
+        ARTIFACT_PATH:   ${{ inputs.artifact_path }}
+        EXECUTABLE_PATH: ${{ inputs.executable_path }}
+        INSECURE_TLS:    ${{ inputs.insecure_tls }}
+      run: |
+        set -euo pipefail
+
+        if [[ ! -f "$ARTIFACT_PATH" ]]; then
+          echo "::error::Artifact not found: $ARTIFACT_PATH" >&2
+          exit 1
+        fi
+
+        DEST_DIR="${EXECUTABLE_PATH%/*}"    # /app/lib
+        DEST_FILE="${EXECUTABLE_PATH##*/}"  # acp-api.jar
+
+        # Build tar with the file renamed to its destination name.
+        # Both staging dir and tar live under the same per-job mktemp dir so
+        # parallel matrix jobs on the same runner cannot collide.
+        # --owner=0 --group=0 --numeric-owner: el archivo entra al container con
+        # uid/gid 0 (root) en vez del uid/gid del runner self-hosted, que no
+        # tiene por qué existir dentro del container y puede romper permisos
+        # según el usuario con que corra la app. Mismo efecto que `cp` en v1.
+        TMPDIR=$(mktemp -d)
+        trap 'rm -rf "$TMPDIR"' EXIT
+        STAGING="$TMPDIR/staging"
+        TAR_PATH="$TMPDIR/upload.tar"
+        mkdir -p "$STAGING"
+        cp "$ARTIFACT_PATH" "$STAGING/$DEST_FILE"
+        tar --owner=0 --group=0 --numeric-owner -cf "$TAR_PATH" -C "$STAGING" "$DEST_FILE"
+
+        CURL_OPTS=(-sS --connect-timeout 10 --max-time 300
+          -H "X-API-KEY: ${PORTAINER_TOKEN}"
+          -H "Content-Type: application/x-tar"
+          -o /dev/null -w "%{http_code}")
+        if [[ "$INSECURE_TLS" == "true" ]]; then
+          CURL_OPTS+=(--insecure)
+        fi
+
+        DEST_DIR_ENC=$(jq -rn --arg p "$DEST_DIR" '$p | @uri')
+
+        echo "Copying $(basename "$ARTIFACT_PATH") -> ${EXECUTABLE_PATH} (container ${CONTAINER_ID:0:12})"
+
+        HTTP_STATUS=$(curl "${CURL_OPTS[@]}" -X PUT \
+          --data-binary "@${TAR_PATH}" \
+          "${PORTAINER_URL}/api/endpoints/${ENDPOINT_ID}/docker/containers/${CONTAINER_ID}/archive?path=${DEST_DIR_ENC}")
+
+        case "$HTTP_STATUS" in
+          200)
+            echo "Artifact copied successfully (HTTP 200)"
+            ;;
+          400)
+            echo "::error::Bad parameter — check executable_path exists in container (HTTP 400)" >&2
+            exit 1
+            ;;
+          403)
+            echo "::error::Permission denied — container rootfs may be read-only (HTTP 403)" >&2
+            exit 1
+            ;;
+          404)
+            echo "::error::Container or path not found (HTTP 404) — endpoint_id=${ENDPOINT_ID} container_id=${CONTAINER_ID:0:12} path=${DEST_DIR}" >&2
+            exit 1
+            ;;
+          *)
+            echo "::error::Failed to copy artifact — HTTP $HTTP_STATUS" >&2
+            exit 1
+            ;;
+        esac

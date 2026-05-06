@@ -1,0 +1,123 @@
+name: Portainer — resolve endpoint & container IDs
+description: >
+  Resuelve endpoint_id y container_id a partir de nombres de compose
+  (stack + service + réplica opcional). C2 del deploy v2 — identificación
+  por labels de compose, no por nombre frágil de container.
+
+inputs:
+  portainer_url:
+    description: URL base de Portainer (sin trailing slash). Ej. https://docker-soporte:9443
+    required: true
+  portainer_token:
+    description: Token API de Portainer (X-API-KEY).
+    required: true
+  endpoint_name:
+    description: Nombre del endpoint Portainer (se busca por PublicURL). Ej. docker-testing
+    required: true
+  portainer_stack:
+    description: Nombre del compose project (com.docker.compose.project). Ej. acp_services
+    required: true
+  portainer_service:
+    description: Nombre del servicio compose (com.docker.compose.service). Ej. acp-api
+    required: true
+  portainer_replica:
+    description: >
+      Número de réplica (com.docker.compose.container-number). Default "1".
+      Para servicios con múltiples réplicas, cada réplica es una instalación
+      separada en deploy.json.
+    required: false
+    default: "1"
+  insecure_tls:
+    description: >
+      Si 'true' usa curl --insecure (deshabilita verificación TLS). Default false
+      por seguridad. El caller debe setearlo a "true" explícitamente cuando el
+      Portainer destino use cert self-signed.
+    required: false
+    default: "false"
+
+outputs:
+  endpoint_id:
+    description: ID numérico del endpoint Portainer
+    value: ${{ steps.resolve.outputs.endpoint_id }}
+  container_id:
+    description: ID del container Docker dentro del endpoint
+    value: ${{ steps.resolve.outputs.container_id }}
+
+runs:
+  using: composite
+  steps:
+    - name: Resolve endpoint and container IDs
+      id: resolve
+      shell: bash
+      env:
+        PORTAINER_URL:     ${{ inputs.portainer_url }}
+        PORTAINER_TOKEN:   ${{ inputs.portainer_token }}
+        ENDPOINT_NAME:     ${{ inputs.endpoint_name }}
+        PORTAINER_STACK:   ${{ inputs.portainer_stack }}
+        PORTAINER_SERVICE: ${{ inputs.portainer_service }}
+        PORTAINER_REPLICA: ${{ inputs.portainer_replica }}
+        INSECURE_TLS:      ${{ inputs.insecure_tls }}
+      run: |
+        set -euo pipefail
+
+        if ! command -v jq &>/dev/null; then
+          echo "::error::jq is required but not installed." >&2
+          exit 1
+        fi
+
+        CURL_OPTS=(-sS --connect-timeout 10 --max-time 30
+          -H "X-API-KEY: ${PORTAINER_TOKEN}"
+          -H "Content-Type: application/json")
+        if [[ "$INSECURE_TLS" == "true" ]]; then
+          CURL_OPTS+=(--insecure)
+        fi
+
+        # 1) Resolve endpoint ID — match by PublicURL
+        ENDPOINT_JSON=$(curl "${CURL_OPTS[@]}" \
+          "${PORTAINER_URL}/api/endpoints?search=$(jq -rn --arg n "$ENDPOINT_NAME" '$n | @uri')")
+
+        ENDPOINT_ID=$(echo "$ENDPOINT_JSON" | \
+          jq --arg name "$ENDPOINT_NAME" '[.[] | select(.PublicURL == $name)][0].Id // empty')
+        if [[ -z "$ENDPOINT_ID" || "$ENDPOINT_ID" == "null" ]]; then
+          echo "::error::Endpoint '$ENDPOINT_NAME' not found in Portainer (searched by PublicURL)" >&2
+          exit 1
+        fi
+        echo "Resolved endpoint '$ENDPOINT_NAME' -> id=$ENDPOINT_ID"
+
+        # 2) Resolve container ID — by compose labels (C2: stack + service + replica).
+        # Filtramos por status=running para evitar agarrar containers stopped/exited
+        # que pueden quedar tras un recreate (mismo set de labels). Si el container
+        # objetivo no está running, el deploy falla — comportamiento esperado:
+        # el state no es válido para copy + restart.
+        FILTER=$(jq -cn \
+          --arg stack   "$PORTAINER_STACK" \
+          --arg service "$PORTAINER_SERVICE" \
+          --arg replica "$PORTAINER_REPLICA" \
+          '{"label": [
+            "com.docker.compose.project=\($stack)",
+            "com.docker.compose.service=\($service)",
+            "com.docker.compose.container-number=\($replica)"
+          ], "status": ["running"]}')
+        FILTER_ENC=$(jq -rn --arg f "$FILTER" '$f | @uri')
+
+        CONTAINERS_JSON=$(curl "${CURL_OPTS[@]}" \
+          "${PORTAINER_URL}/api/endpoints/${ENDPOINT_ID}/docker/containers/json?all=true&filters=${FILTER_ENC}")
+
+        COUNT=$(echo "$CONTAINERS_JSON" | jq 'length')
+        if [[ "$COUNT" == "0" ]]; then
+          echo "::error::No running container found for stack='${PORTAINER_STACK}' service='${PORTAINER_SERVICE}' replica='${PORTAINER_REPLICA}' in endpoint '${ENDPOINT_NAME}'. Container missing or stopped." >&2
+          exit 1
+        fi
+        if [[ "$COUNT" -gt 1 ]]; then
+          echo "::warning::Multiple running containers matched (count=$COUNT) — using first. Check portainer_replica in deploy.json." >&2
+        fi
+
+        CONTAINER_ID=$(echo "$CONTAINERS_JSON" | jq -r '.[0].Id // empty')
+        if [[ -z "$CONTAINER_ID" ]]; then
+          echo "::error::Could not extract container ID" >&2
+          exit 1
+        fi
+
+        echo "Resolved ${PORTAINER_STACK}/${PORTAINER_SERVICE}[${PORTAINER_REPLICA}] -> container ${CONTAINER_ID:0:12}"
+        echo "endpoint_id=$ENDPOINT_ID"   >> "$GITHUB_OUTPUT"
+        echo "container_id=$CONTAINER_ID" >> "$GITHUB_OUTPUT"

@@ -1,0 +1,353 @@
+name: scala-api — deploy (v2)
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: Ambiente destino (testing | staging | production)
+        type: string
+        required: true
+      version:
+        description: Tag del GitHub Release a deployar (ej. v1.2.0-snapshot.003, v1.2.0-rc.001, v1.2.0)
+        type: string
+        required: true
+      installations:
+        description: Instalaciones destino (coma-separado). Vacío = todas las que tengan auto_deploy=true.
+        type: string
+        required: false
+        default: ""
+    secrets:
+      PORTAINER_TOKEN_DEPLOY:
+        description: >
+          Token API de Portainer (X-API-KEY). Org secret aprovisionado por el
+          runbook de Fase 0 (CI-CD#95) — mismo nombre que en la org.
+        required: true
+      GCHAT_WEBHOOK_PRODUCTION:
+        description: >
+          Webhook Google Chat para notificar deploys a production. Org secret
+          GCHAT_WEBHOOK_PRODUCTION (Fase 0). Solo se consume cuando
+          inputs.environment = production.
+        required: false
+      GCHAT_WEBHOOK_TESTING_STAGING:
+        description: >
+          Webhook Google Chat para notificar deploys a testing/staging. Org
+          secret GCHAT_WEBHOOK_TESTING_STAGING (Fase 0). Solo se consume cuando
+          inputs.environment ≠ production.
+        required: false
+
+jobs:
+
+  # ---------------------------------------------------------------------------
+  # Plan: lee .github/deploy.json, valida ambiente, filtra instalaciones
+  # (auto_deploy o selección explícita) y emite la matriz para el job deploy.
+  # ---------------------------------------------------------------------------
+  plan:
+    name: Plan (${{ inputs.environment }})
+    runs-on: ubuntu-latest
+    outputs:
+      matrix:        ${{ steps.plan.outputs.matrix }}
+      count:         ${{ steps.plan.outputs.count }}
+      pending_count: ${{ steps.plan.outputs.pending_count }}
+      pending_names: ${{ steps.plan.outputs.pending_names }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build deployment matrix
+        id: plan
+        env:
+          ENVIRONMENT:   ${{ inputs.environment }}
+          INSTALLATIONS: ${{ inputs.installations }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! -f .github/deploy.json ]]; then
+            echo "::error::.github/deploy.json not found — see docs/deploy-json-schema.md" >&2
+            exit 1
+          fi
+
+          ENV_CONFIG=$(jq --arg e "$ENVIRONMENT" '.environments[$e] // empty' .github/deploy.json)
+          if [[ -z "$ENV_CONFIG" ]]; then
+            echo "::error::deploy.json does not define environment '$ENVIRONMENT'" >&2
+            exit 1
+          fi
+
+          PENDING_COUNT=0
+          PENDING_NAMES=""
+
+          if [[ -z "$INSTALLATIONS" ]]; then
+            # Modo automático: instalaciones con auto_deploy=true se deployan;
+            # las que tienen auto_deploy=false se reportan como "manual pendiente".
+            SELECTED=$(echo "$ENV_CONFIG" | jq '[.installations[] | select(.auto_deploy == true)]')
+            PENDING=$(echo "$ENV_CONFIG"  | jq '[.installations[] | select(.auto_deploy != true)]')
+            PENDING_COUNT=$(echo "$PENDING" | jq 'length')
+            PENDING_NAMES=$(echo "$PENDING" | jq -r '[.[].name] | join(", ")')
+          else
+            # Modo manual: validar que TODOS los nombres pedidos existan en el env.
+            # Si hay nombres no encontrados → fail-loud (evita rollouts parciales
+            # que parezcan exitosos por typo del operador).
+            REQUESTED_LIST=$(echo "$INSTALLATIONS" | tr ',' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | grep -v '^$' | sort -u || true)
+            if [[ -z "$REQUESTED_LIST" ]]; then
+              echo "::error::Manual selection 'installations' is empty after trimming. Provide a comma-separated list of installation names." >&2
+              exit 1
+            fi
+            SELECTED=$(echo "$ENV_CONFIG" | jq --arg csv "$INSTALLATIONS" \
+              '($csv | split(",") | map(gsub("^\\s+|\\s+$"; "")) | map(select(. != ""))) as $names
+               | [.installations[] | select(.name as $n | $names | index($n))]')
+            FOUND_LIST=$(echo "$SELECTED" | jq -r '.[].name' | sort -u)
+            MISSING=$(comm -23 <(echo "$REQUESTED_LIST") <(echo "$FOUND_LIST") | tr '\n' ',' | sed 's/,$//')
+            if [[ -n "$MISSING" ]]; then
+              VALID=$(echo "$ENV_CONFIG" | jq -r '[.installations[].name] | join(", ")')
+              echo "::error::Manual selection contains unknown installations for env '$ENVIRONMENT': $MISSING. Valid names: $VALID" >&2
+              exit 1
+            fi
+          fi
+
+          COUNT=$(echo "$SELECTED" | jq 'length')
+          if [[ "$COUNT" == "0" && "$PENDING_COUNT" == "0" ]]; then
+            echo "::warning::Environment '$ENVIRONMENT' has no installations configured."
+          fi
+
+          echo "matrix=$(echo "$SELECTED" | jq -c '{include: .}')" >> "$GITHUB_OUTPUT"
+          echo "count=$COUNT"                                       >> "$GITHUB_OUTPUT"
+          echo "pending_count=$PENDING_COUNT"                       >> "$GITHUB_OUTPUT"
+          echo "pending_names=$PENDING_NAMES"                       >> "$GITHUB_OUTPUT"
+
+  # ---------------------------------------------------------------------------
+  # Deploy: una instancia por instalación (matriz paralela).
+  # Gated por GH Environment — production requiere reviewer del Team
+  # bqn-uy/deploy-approvers-banquinet (D5).
+  # Runner: self-hosted en docker-soporte, con acceso a Portainer API (C1).
+  # ---------------------------------------------------------------------------
+  deploy:
+    name: Deploy ${{ matrix.name }}
+    needs: plan
+    if: needs.plan.outputs.count != '0'
+    runs-on: [self-hosted, bqn-deploy]
+    environment: ${{ inputs.environment }}
+    # Concurrency por (environment, installation): evita race entre dos deploys
+    # disparados al mismo target (p.ej. push a develop + workflow_dispatch
+    # superpuestos). cancel-in-progress: false → encolan, no se pisan.
+    concurrency:
+      group: deploy-${{ inputs.environment }}-${{ matrix.name }}
+      cancel-in-progress: false
+    permissions:
+      contents:    read
+      deployments: write
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.plan.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validar configuración org
+        env:
+          PORTAINER_URL: ${{ vars.PORTAINER_URL }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "$PORTAINER_URL" ]]; then
+            echo "::error::Org var PORTAINER_URL no está configurada (o no es visible para este repo). Es requerida por las composites Portainer. Ver runbook de Fase 0 (CI-CD#95)." >&2
+            exit 1
+          fi
+
+      - name: Create deployment record
+        id: deployment
+        env:
+          GH_TOKEN:     ${{ github.token }}
+          ENVIRONMENT:  ${{ inputs.environment }}
+          VERSION:      ${{ inputs.version }}
+          INSTALLATION: ${{ matrix.name }}
+          LOG_URL:      ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          PROD=$([[ "$ENVIRONMENT" == "production" ]] && echo true || echo false)
+          DEPLOYMENT_ID=$(gh api --method POST \
+            "repos/${GITHUB_REPOSITORY}/deployments" \
+            -f ref="$VERSION" \
+            -f environment="$ENVIRONMENT" \
+            -f description="$INSTALLATION via GH Actions" \
+            -F auto_merge=false \
+            -F production_environment=$PROD \
+            -F required_contexts='[]' \
+            --jq '.id')
+          echo "id=$DEPLOYMENT_ID" >> "$GITHUB_OUTPUT"
+          echo "Created deployment ${DEPLOYMENT_ID} for ${INSTALLATION} → ${ENVIRONMENT} (${VERSION})"
+
+          gh api --method POST \
+            "repos/${GITHUB_REPOSITORY}/deployments/${DEPLOYMENT_ID}/statuses" \
+            -f state=in_progress \
+            -f environment="$ENVIRONMENT" \
+            -f log_url="$LOG_URL" \
+            -f description="Started" >/dev/null
+
+      # insecure_tls=true en los 3 steps Portainer: docker-soporte usa cert
+      # self-signed (continuidad con v1). Los composites defaultean a false
+      # por seguridad; lo activamos explícitamente acá.
+      - name: Resolve Portainer IDs
+        id: ids
+        uses: BQN-UY/CI-CD/.github/actions/shared/portainer-resolve-ids@v2
+        with:
+          portainer_url:     ${{ vars.PORTAINER_URL }}
+          portainer_token:   ${{ secrets.PORTAINER_TOKEN_DEPLOY }}
+          endpoint_name:     ${{ matrix.portainer_endpoint }}
+          portainer_stack:   ${{ matrix.portainer_stack }}
+          portainer_service: ${{ matrix.portainer_service }}
+          portainer_replica: ${{ matrix.portainer_replica || '1' }}
+          insecure_tls:      "true"
+
+      - name: Download artifact from GH Release
+        id: download
+        env:
+          GH_TOKEN:        ${{ github.token }}
+          TAG:             ${{ inputs.version }}
+          EXECUTABLE_PATH: ${{ matrix.executable_path }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          EXT="${EXECUTABLE_PATH##*.}"
+          gh release download "$TAG" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --pattern "*.${EXT}" \
+            --dir ./_artifact
+          ARTIFACT_PATH=$(ls ./_artifact/*."${EXT}" | head -n1)
+          echo "artifact_path=${ARTIFACT_PATH}" >> "$GITHUB_OUTPUT"
+          echo "Downloaded: ${ARTIFACT_PATH}"
+
+      - name: Copy artifact into container
+        uses: BQN-UY/CI-CD/.github/actions/shared/portainer-copy-artifact@v2
+        with:
+          portainer_url:   ${{ vars.PORTAINER_URL }}
+          portainer_token: ${{ secrets.PORTAINER_TOKEN_DEPLOY }}
+          endpoint_id:     ${{ steps.ids.outputs.endpoint_id }}
+          container_id:    ${{ steps.ids.outputs.container_id }}
+          artifact_path:   ${{ steps.download.outputs.artifact_path }}
+          executable_path: ${{ matrix.executable_path }}
+          insecure_tls:    "true"
+
+      - name: Restart container
+        uses: BQN-UY/CI-CD/.github/actions/shared/portainer-restart-container@v2
+        with:
+          portainer_url:   ${{ vars.PORTAINER_URL }}
+          portainer_token: ${{ secrets.PORTAINER_TOKEN_DEPLOY }}
+          endpoint_id:     ${{ steps.ids.outputs.endpoint_id }}
+          container_id:    ${{ steps.ids.outputs.container_id }}
+          insecure_tls:    "true"
+
+      - name: Mark deployment success
+        if: success() && steps.deployment.outputs.id != ''
+        env:
+          GH_TOKEN:      ${{ github.token }}
+          ENVIRONMENT:   ${{ inputs.environment }}
+          DEPLOYMENT_ID: ${{ steps.deployment.outputs.id }}
+          LOG_URL:       ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api --method POST \
+            "repos/${GITHUB_REPOSITORY}/deployments/${DEPLOYMENT_ID}/statuses" \
+            -f state=success \
+            -f environment="$ENVIRONMENT" \
+            -f log_url="$LOG_URL" \
+            -f description="Deploy completed" >/dev/null
+
+      - name: Mark deployment failure
+        if: failure() && steps.deployment.outputs.id != ''
+        env:
+          GH_TOKEN:      ${{ github.token }}
+          ENVIRONMENT:   ${{ inputs.environment }}
+          DEPLOYMENT_ID: ${{ steps.deployment.outputs.id }}
+          LOG_URL:       ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api --method POST \
+            "repos/${GITHUB_REPOSITORY}/deployments/${DEPLOYMENT_ID}/statuses" \
+            -f state=failure \
+            -f environment="$ENVIRONMENT" \
+            -f log_url="$LOG_URL" \
+            -f description="Deploy failed" >/dev/null
+
+  # ---------------------------------------------------------------------------
+  # Notify: resumen a Google Chat. Corre siempre (éxito o fallo).
+  # Webhook elegido por environment: production → GCHAT_WEBHOOK_PRODUCTION,
+  # resto → GCHAT_WEBHOOK_TESTING_STAGING. Org secrets de Fase 0 (CI-CD#95).
+  # Production hard-fails si el webhook está vacío para evitar mis-routing
+  # silencioso al canal de testing/staging (CI-CD#114).
+  # ---------------------------------------------------------------------------
+  notify:
+    name: Notify
+    needs: [plan, deploy]
+    if: always() && needs.plan.outputs.count != '0'
+    runs-on: ubuntu-latest
+    env:
+      WEBHOOK: ${{ inputs.environment == 'production' && secrets.GCHAT_WEBHOOK_PRODUCTION || secrets.GCHAT_WEBHOOK_TESTING_STAGING }}
+    steps:
+      - name: Hard-fail si production webhook está vacío
+        if: inputs.environment == 'production'
+        env:
+          WEBHOOK_PROD: ${{ secrets.GCHAT_WEBHOOK_PRODUCTION }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "$WEBHOOK_PROD" ]]; then
+            echo "::error::GCHAT_WEBHOOK_PRODUCTION está vacío o no seteado para un deploy a production. Se aborta para evitar routing silencioso al canal de testing/staging." >&2
+            exit 1
+          fi
+
+      - name: Send Google Chat message
+        if: env.WEBHOOK != ''
+        env:
+          ENVIRONMENT: ${{ inputs.environment }}
+          VERSION:     ${{ inputs.version }}
+          STATUS:      ${{ needs.deploy.result }}
+          ACTOR:       ${{ github.actor }}
+          RUN_URL:     ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          EMOJI=$([[ "$STATUS" == "success" ]] && echo "✅" || echo "❌")
+          BODY=$(jq -nc \
+            --arg t "${EMOJI} Deploy *${GITHUB_REPOSITORY##*/}* *${VERSION}* → *${ENVIRONMENT}* — *${STATUS}* (por ${ACTOR}) <${RUN_URL}|ver run>" \
+            '{text: $t}')
+          curl -sS -X POST -H "Content-Type: application/json" -d "$BODY" "$WEBHOOK" >/dev/null
+
+  # ---------------------------------------------------------------------------
+  # Notify-pending: avisa a operadores cuando hay instalaciones con
+  # auto_deploy=false que el workflow saltó (capability de v2 — evita que
+  # se pierda visibilidad de versiones que esperan deploy manual).
+  # ---------------------------------------------------------------------------
+  notify-pending:
+    name: Notify manual pending
+    needs: plan
+    if: needs.plan.outputs.pending_count != '0'
+    runs-on: ubuntu-latest
+    env:
+      WEBHOOK: ${{ inputs.environment == 'production' && secrets.GCHAT_WEBHOOK_PRODUCTION || secrets.GCHAT_WEBHOOK_TESTING_STAGING }}
+    steps:
+      - name: Hard-fail si production webhook está vacío
+        if: inputs.environment == 'production'
+        env:
+          WEBHOOK_PROD: ${{ secrets.GCHAT_WEBHOOK_PRODUCTION }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "$WEBHOOK_PROD" ]]; then
+            echo "::error::GCHAT_WEBHOOK_PRODUCTION está vacío o no seteado para un deploy a production. Se aborta para evitar routing silencioso al canal de testing/staging." >&2
+            exit 1
+          fi
+
+      - name: Send "manual pending" message to Google Chat
+        if: env.WEBHOOK != ''
+        env:
+          ENVIRONMENT:   ${{ inputs.environment }}
+          VERSION:       ${{ inputs.version }}
+          PENDING_NAMES: ${{ needs.plan.outputs.pending_names }}
+          DISPATCH_URL:  ${{ github.server_url }}/${{ github.repository }}/actions/workflows/deploy.yml
+        shell: bash
+        run: |
+          set -euo pipefail
+          BODY=$(jq -nc \
+            --arg t "⏸️ *${GITHUB_REPOSITORY##*/}* *${VERSION}* → *${ENVIRONMENT}* — *manual pendiente* para: ${PENDING_NAMES}. <${DISPATCH_URL}|disparar workflow>" \
+            '{text: $t}')
+          curl -sS -X POST -H "Content-Type: application/json" -d "$BODY" "$WEBHOOK" >/dev/null
